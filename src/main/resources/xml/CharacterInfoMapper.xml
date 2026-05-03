@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.djs.novel.ai.mapper.CharacterInfoMapper">
+
+    <select id="findByBookIdAndName" resultType="com.djs.novel.ai.entity.CharacterInfo">
+        SELECT * FROM character_info
+        WHERE book_id = #{bookId}
+          AND character_name LIKE CONCAT('%', #{characterName}, '%')
+    </select>
+
+    <select id="findByBookId" resultType="com.djs.novel.ai.entity.CharacterInfo">
+        SELECT * FROM character_info
+        WHERE book_id = #{bookId}
+        ORDER BY id ASC
+    </select>
+
+</mapper>
