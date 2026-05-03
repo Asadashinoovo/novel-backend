@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.djs.novel.mapper.BookInfoMapper">
+
+    <select id="getBookInfoByPage" resultType="com.djs.novel.vo.BookVO">
+        SELECT book_info.id, title, cover, description,author_id,
+               user.username as author_name
+        FROM book_info left join user
+            on book_info.author_id=user.id
+        <where>
+            <if test="keyword != null and keyword.trim() != ''">
+                AND (title LIKE CONCAT('%', #{keyword}, '%') )
+            </if>
+        </where>
+        ORDER BY updated_at DESC
+        LIMIT #{offset},#{pageSize}
+    </select>
+
+    <select id="getBookById" resultType="com.djs.novel.vo.BookVO">
+        SELECT book_info.id, book_info.title,
+               book_info.author_id, book_info.cover,
+               book_info.description,
+               book_info.hot_count,
+               user.username as author_name
+        FROM book_info left join user
+        on book_info.author_id = user.id
+        WHERE book_info.id = #{id}
+    </select>
+
+    <select id="getTypesByBookId" resultType="com.djs.novel.entity.BookType">
+        SELECT t.id,t.type_name FROM book_type t
+        INNER JOIN book_info_book_type bb ON t.id = bb.type_id
+        WHERE bb.book_id = #{id}
+    </select>
+
+    <select id="getBookByIds" resultType="com.djs.novel.entity.BookInfo">
+        SELECT * FROM book_info WHERE id IN
+        <foreach collection="list" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <update id="updateBook">
+        UPDATE book_info
+        <set>
+            <if test="title != null and title != ''">title = #{title},</if>
+            <if test="cover != null">cover = #{cover},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="hotCount != null">hot_count = #{hotCount},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteBatchByIds">
+        DELETE FROM book_info WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <delete id="deleleTypesByBookIds">
+        DELETE FROM book_info_book_type WHERE book_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <insert id="addTypes">
+        INSERT INTO book_info_book_type (book_id,type_id)
+        VALUES
+            <foreach collection="types" item="type" separator=",">
+                (#{bookId},#{type.id})
+            </foreach>
+    </insert>
+
+    <delete id="deleteTypes">
+
+    </delete>
+
+</mapper>

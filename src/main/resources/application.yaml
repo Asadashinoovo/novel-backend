@@ -1,0 +1,24 @@
+mybatis-plus:
+  mapper-locations: classpath:xml/*.xml
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+server:
+  port: 8081
+spring:
+  application:
+    name: djs
+  profiles:
+    active : dev
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/novel?characterEncoding=utf8&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Shanghai
+    username: root
+    password: daidai441
+
+
+  data:
+    redis:
+      host: 192.168.183.129
+      port: 6379
+      password:

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.djs.novel.mapper.BookChapterMapper">
+
+    <select id="getChapterListByBookId" resultType="com.djs.novel.vo.ChapterListVO">
+        SELECT
+            id,
+            title,
+            word_count,
+            read_count,
+            ROW_NUMBER() OVER(PARTITION BY book_id ORDER BY sort_order ASC, id ASC) AS chapterNum
+        FROM book_chapter
+        WHERE book_id = #{bookId}
+        ORDER BY sort_order ASC, id ASC
+    </select>
+
+    <select id="getChapterContentById" resultType="com.djs.novel.vo.ChapterContentVO">
+        SELECT id, title, content,word_count,read_count
+        FROM book_chapter
+        WHERE id = #{id} AND book_id = #{bookId}
+    </select>
+
+    <update id="incrReadCount">
+        UPDATE book_chapter SET read_count = read_count + 1 WHERE id = #{id}
+    </update>
+
+    <delete id="deleteByBookIds">
+        DELETE FROM book_chapter WHERE book_id IN
+        <foreach collection="bookIds" item="bookId" open="(" separator="," close=")">
+            #{bookId}
+        </foreach>
+    </delete>
+
+    <insert id="addChapter">
+        <selectKey keyProperty="bookChapter.sortOrder" resultType="java.lang.Integer" order="BEFORE">
+            SELECT COALESCE(MAX(sort_order), 0) + 10
+            FROM book_chapter
+            WHERE book_id = #{bookChapter.bookId}
+        </selectKey>
+
+        <!-- 2. 执行插入 -->
+        INSERT INTO book_chapter (
+        book_id,sort_order,title,content, created_at, updated_at,word_count
+        ) VALUES (#{bookChapter.bookId},
+              #{bookChapter.sortOrder},
+              #{bookChapter.title},
+              #{bookChapter.content},
+              #{bookChapter.createdAt},
+              #{bookChapter.updatedAt},
+              #{bookChapter.wordCount}
+        )
+    </insert>
+
+    <update id="updateChapter">
+        UPDATE book_chapter
+        <set>
+            <if test="bookChapter.title != null and bookChapter.title.trim() != ''">
+                title = #{bookChapter.title},
+            </if>
+            <if test="bookChapter.content != null">
+                content = #{bookChapter.content},
+            </if>
+
+            <if test="bookChapter.wordCount != null">
+                word_count = #{bookChapter.wordCount},
+            </if>
+            <!-- 更新时间强制刷新，不参与 if 判断 -->
+            updated_at = NOW()
+        </set>
+        WHERE id = #{bookChapter.id}
+        AND book_id = #{bookChapter.bookId}
+    </update>
+
+
+</mapper>
