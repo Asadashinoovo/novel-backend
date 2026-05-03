@@ -17,16 +17,6 @@ public class UserController {
     @Autowired
     private UserMapper userMapper;
 
-    /*@GetMapping("/info")
-    public Result getUserInfo(@RequestAttribute("userId") Long userId) {
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            return Result.fail("用户不存在");
-        }
-
-        UserVO userVO = new UserVO(user.getId(), user.getUsername());
-        return Result.ok(userVO);
-    }*/
 
     @GetMapping("/me")
     public Result me() {
@@ -36,5 +26,13 @@ public class UserController {
             return Result.fail("未登录");
         }
         return Result.ok(new UserVO(user.getId(), user.getUsername(),user.getImgUrl()));
+    }
+
+
+    @PostMapping("/adduser")
+    public Result addUser() {
+
+
+        return Result.ok();
     }
 }
