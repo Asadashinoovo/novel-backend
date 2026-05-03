@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.djs.novel.ai.mapper.ChapterSummaryMapper">
+
+    <select id="getLatestSummary" resultType="com.djs.novel.ai.entity.ChapterSummary">
+        SELECT cs.*
+        FROM chapter_summary cs
+        JOIN book_chapter bc ON cs.chapter_id = bc.id
+        WHERE cs.book_id = #{bookId}
+          AND cs.status = 'COMPLETED'
+        ORDER BY bc.sort_order DESC
+        LIMIT 1
+    </select>
+
+    <select id="getSummaryUpToChapter" resultType="com.djs.novel.ai.entity.ChapterSummary">
+        SELECT cs.*
+        FROM chapter_summary cs
+        WHERE cs.book_id = #{bookId}
+          AND cs.chapter_id = #{chapterId}
+          AND cs.status = 'COMPLETED'
+    </select>
+
+    <select id="getSummaryUpToSortOrder" resultType="com.djs.novel.ai.entity.ChapterSummary">
+        SELECT cs.*
+        FROM chapter_summary cs
+        JOIN book_chapter bc ON cs.chapter_id = bc.id
+        WHERE cs.book_id = #{bookId}
+          AND bc.sort_order &lt; #{sortOrder}
+          AND cs.status = 'COMPLETED'
+        ORDER BY bc.sort_order DESC
+        LIMIT 1
+    </select>
+
+</mapper>

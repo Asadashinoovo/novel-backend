@@ -71,5 +71,14 @@
         AND book_id = #{bookChapter.bookId}
     </update>
 
+    <!-- 关键词搜索：用全文 LIKE 匹配章节内容 -->
+    <select id="searchChaptersByKeywords" resultType="com.djs.novel.entity.BookChapter">
+        SELECT id, book_id, sort_order, title, content, word_count, read_count, created_at, updated_at
+        FROM book_chapter
+        WHERE book_id = #{bookId}
+          AND content LIKE CONCAT('%', #{question}, '%')
+        ORDER BY sort_order ASC
+        LIMIT 30
+    </select>
 
 </mapper>
