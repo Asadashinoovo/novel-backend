@@ -14,11 +14,18 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/novel?characterEncoding=utf8&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Shanghai
     username: root
-    password: daidai441
+    password: 123456
 
 
   data:
     redis:
-      host: 192.168.183.129
+      host: localhost
       port: 6379
       password:
+
+deepseek:
+  api:
+    key: sk-194eea6eecc04aba97cc77382067d379
+    base-url: https://api.deepseek.com
+    chat-model: deepseek-v4-pro
+    timeout: 120

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.djs.novel.ai.mapper.ChapterEmbeddingMapper">
+
+    <select id="getEmbeddingsByBookId" resultType="com.djs.novel.ai.entity.ChapterEmbedding">
+        SELECT
+            ce.id,
+            ce.chapter_id AS chapterId,
+            ce.book_id AS bookId,
+            ce.embedding,
+            ce.model,
+            bc.sort_order AS sortOrder
+        FROM chapter_embedding ce
+        JOIN book_chapter bc ON ce.chapter_id = bc.id
+        WHERE ce.book_id = #{bookId}
+        ORDER BY bc.sort_order ASC
+    </select>
+
+</mapper>

@@ -29,4 +29,10 @@ public interface BookChapterMapper extends BaseMapper<BookChapter> {
     @Delete("delete from book_chapter where id=#{id} and book_id=#{bookId}")
     int deleteChapter(Long bookId, Long id);
 
+    /**
+     * 关键词搜索章节：用 LIKE 匹配内容中包含关键词的章节，按 sort_order 排序
+     */
+    List<BookChapter> searchChaptersByKeywords(@Param("bookId") Long bookId,
+                                               @Param("question") String question);
+
 }
