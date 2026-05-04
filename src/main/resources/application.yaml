@@ -18,7 +18,7 @@ spring:
 
   data:
     redis:
-      host: localhost
+      host: 192.168.183.255
       port: 6379
       password: your_psw
 
@@ -31,9 +31,9 @@ deepseek:
 
 dashscope:
   api:
-    key:
+    key: your_apikey
   embedding:
-    model: text-embedding-v3
+    model: sk-7305be2f0dcb4b5ea8a7eb07baec4c4f
     dimensions: 1024
 
 novel:
