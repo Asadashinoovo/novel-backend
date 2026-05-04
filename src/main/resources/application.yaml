@@ -25,7 +25,22 @@ spring:
 
 deepseek:
   api:
-    key: ${DEEPSEEK_API_KEY:}
+    key: sk-d47af614aff7474382798b62683db216
     base-url: https://api.deepseek.com
     chat-model: deepseek-v4-pro
     timeout: 120
+
+dashscope:
+  api:
+    key: sk-a53e45e88ac64a3db06a20e2e8c351fa
+  embedding:
+    model: text-embedding-v3
+    dimensions: 1024
+
+novel:
+  ai:
+    search-mode: hybrid         # fulltext | vector | hybrid | elasticsearch
+    mq-mode: noop               # noop | rocketmq | rabbitmq
+    cache-enabled: true
+    cache-ttl-hours: 24
+    async-threshold-ms: 10000   # 超过 10s 的请求走 MQ 异步

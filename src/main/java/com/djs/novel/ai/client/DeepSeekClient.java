@@ -48,7 +48,7 @@ public class DeepSeekClient {
                             Map.of("role", "system", "content", systemPrompt),
                             Map.of("role", "user", "content", userPrompt)
                     ),
-                    "max_tokens", 4096
+                    "max_tokens", 2048
             );
 
             HttpHeaders headers = new HttpHeaders();

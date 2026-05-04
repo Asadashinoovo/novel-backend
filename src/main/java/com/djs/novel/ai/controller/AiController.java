@@ -3,7 +3,7 @@ package com.djs.novel.ai.controller;
 import com.djs.novel.ai.dto.ChatRequest;
 import com.djs.novel.ai.dto.CharacterSearchRequest;
 import com.djs.novel.ai.service.ICharacterService;
-import com.djs.novel.ai.service.IChatService;
+import com.djs.novel.ai.orchestrator.AiOrchestrator;
 import com.djs.novel.ai.service.ISummaryService;
 import com.djs.novel.dto.Result;
 import com.djs.novel.entity.BookChapter;
@@ -29,7 +29,7 @@ public class AiController {
     private ICharacterService characterService;
 
     @Autowired
-    private IChatService chatService;
+    private AiOrchestrator aiOrchestrator;
 
     @Autowired
     private BookChapterMapper bookChapterMapper;
@@ -76,7 +76,7 @@ public class AiController {
      */
     @PostMapping("/chat")
     public Result chat(@RequestBody ChatRequest request) {
-        return chatService.chat(request);
+        return aiOrchestrator.chat(request);
     }
 
     /**

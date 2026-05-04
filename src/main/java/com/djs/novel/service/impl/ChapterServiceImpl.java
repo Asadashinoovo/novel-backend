@@ -30,6 +30,7 @@ public class ChapterServiceImpl
     BookInfoMapper bookInfoMapper;
 
     @Override
+    @Transactional
     public Result getChapterById(Long bookId, Long id) {
         ChapterContentVO chapter = chapterMapper.getChapterContentById(id, bookId);
         if (chapter == null) {
