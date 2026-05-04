@@ -1,13 +1,16 @@
-package com.djs.novel.ai.service.impl;
+package com.djs.novel.ai.orchestrator;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.djs.novel.ai.cache.ICacheLayer;
 import com.djs.novel.ai.client.DeepSeekClient;
 import com.djs.novel.ai.dto.ChatRequest;
 import com.djs.novel.ai.dto.ChatResponse;
-import com.djs.novel.mapper.BookChapterMapper;
-import com.djs.novel.ai.service.IChatService;
+import com.djs.novel.ai.search.ISearchEngine;
+import com.djs.novel.ai.search.SearchQuery;
+import com.djs.novel.ai.search.SearchResult;
 import com.djs.novel.dto.Result;
 import com.djs.novel.entity.BookChapter;
+import com.djs.novel.mapper.BookChapterMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -18,7 +21,13 @@ import java.util.List;
 
 @Service
 @Slf4j
-public class ChatServiceImpl implements IChatService {
+public class AiOrchestratorImpl implements AiOrchestrator {
+
+    @Autowired
+    private ISearchEngine searchEngine;
+
+    @Autowired
+    private ICacheLayer cacheLayer;
 
     @Autowired
     private DeepSeekClient deepSeekClient;
@@ -33,6 +42,7 @@ public class ChatServiceImpl implements IChatService {
     public Result chat(ChatRequest request) {
         log.info("chat request: bookId={}, question={}, maxChapterId={}",
                 request.getBookId(), request.getQuestion(), request.getMaxChapterId());
+
         if (!StringUtils.hasText(request.getQuestion())) {
             return Result.fail("问题不能为空");
         }
@@ -40,10 +50,14 @@ public class ChatServiceImpl implements IChatService {
             return Result.fail("书籍ID不能为空");
         }
 
-        // 1. 关键词搜索：用多窗口 token 构建 LIKE 条件搜索章节内容
-        List<BookChapter> matchingChapters = searchChapters(request.getBookId(), request.getQuestion());
+        // 1. 缓存检查
+        String cached = cacheLayer.get(request.getBookId(), request.getQuestion()).orElse(null);
+        if (cached != null) {
+            ChatResponse chatResponse = new ChatResponse(cached, List.of());
+            return Result.ok(chatResponse);
+        }
 
-        // 2. 获取当前章节（用于越章保护 + 优先加入上下文）
+        // 2. 获取当前章节（越章保护）
         Integer maxSortOrder = null;
         BookChapter currentChapter = null;
         if (request.getMaxChapterId() != null) {
@@ -53,15 +67,20 @@ public class ChatServiceImpl implements IChatService {
             }
         }
 
-        // 3. 构建上下文：始终优先包含当前章节（用户大概率在问当前章节相关的内容）
+        // 3. 检索
+        SearchQuery searchQuery = new SearchQuery(
+                request.getBookId(), request.getQuestion(), maxSortOrder, TOP_K);
+        List<SearchResult> searchResults = searchEngine.search(searchQuery);
+
+        // 4. 构建上下文
         List<ChapterContext> contexts = new ArrayList<>();
         java.util.Set<Long> addedChapterIds = new java.util.HashSet<>();
 
-        // 3a. 先加入当前章节及其前置章节（用户可见 <= maxSortOrder 的所有章节）
+        // 4a. 始终优先包含当前章节
         if (currentChapter != null && StringUtils.hasText(currentChapter.getContent())) {
             addChapterSnippet(currentChapter, contexts, addedChapterIds);
 
-            // 兜底：也加入最近的前置章节，确保用户问"前几章"时有上下文可用
+            // 兜底：也加入最近的前置章节
             if (contexts.size() < TOP_K) {
                 List<BookChapter> priorChapters = bookChapterMapper.selectList(
                         new QueryWrapper<BookChapter>()
@@ -78,22 +97,16 @@ public class ChatServiceImpl implements IChatService {
             }
         }
 
-        // 3b. 再加入关键词搜索匹配的章节
-        for (BookChapter chapter : matchingChapters) {
-            if (!StringUtils.hasText(chapter.getContent())) {
-                continue;
-            }
-            if (addedChapterIds.contains(chapter.getId())) {
-                continue;
-            }
-            if (maxSortOrder != null && chapter.getSortOrder() > maxSortOrder) {
-                continue;
-            }
-            addChapterSnippet(chapter, contexts, addedChapterIds);
+        // 4b. 加入检索匹配的章节
+        for (SearchResult sr : searchResults) {
             if (contexts.size() >= TOP_K) break;
+            if (addedChapterIds.contains(sr.chapterId())) continue;
+            BookChapter chapter = bookChapterMapper.selectById(sr.chapterId());
+            if (chapter == null || !StringUtils.hasText(chapter.getContent())) continue;
+            addChapterSnippet(chapter, contexts, addedChapterIds);
         }
 
-        // 3c. 如果还是没有结果（没传 maxChapterId 且关键词也搜不到），则报错
+        // 4c. 无结果
         if (contexts.isEmpty()) {
             return Result.fail("未找到相关章节内容，请尝试其他问题");
         }
@@ -101,7 +114,7 @@ public class ChatServiceImpl implements IChatService {
         // 按 sortOrder 排序
         contexts.sort((a, b) -> a.sortOrder().compareTo(b.sortOrder()));
 
-        // 4. 构建 RAG prompt
+        // 5. 构建 RAG prompt
         StringBuilder contextBlock = new StringBuilder();
         List<ChatResponse.SourceInfo> sources = new ArrayList<>();
 
@@ -131,12 +144,15 @@ public class ChatServiceImpl implements IChatService {
                 用户问题：%s
                 """, contextBlock.toString(), request.getQuestion());
 
-        // 5. 调用 AI
+        // 6. 调用 LLM
         String answer = deepSeekClient.chatCompletion(systemPrompt, userPrompt);
 
         if (answer == null || answer.isBlank()) {
             return Result.fail("AI 暂时无法回答，请稍后重试");
         }
+
+        // 7. 写缓存
+        cacheLayer.put(request.getBookId(), request.getQuestion(), answer);
 
         ChatResponse chatResponse = new ChatResponse(answer, sources);
         return Result.ok(chatResponse);
@@ -152,43 +168,5 @@ public class ChatServiceImpl implements IChatService {
         contexts.add(new ChapterContext(
                 chapter.getId(), chapter.getSortOrder(), chapter.getTitle(), snippet));
         addedIds.add(chapter.getId());
-    }
-
-    /**
-     * 用问题文本中的多窗口 token 同时搜索章节标题和内容。
-     * 标题匹配对"第X章讲了什么"这类元问题至关重要。
-     */
-    private List<BookChapter> searchChapters(Long bookId, String question) {
-        // 去除空白
-        String text = question.replaceAll("\\s+", "").trim();
-
-        if (text.isEmpty()) {
-            return List.of();
-        }
-
-        // 构建多窗口 LIKE 条件（转义单引号防 SQL 注入）
-        String safeText = text.replace("'", "''");
-
-        String sqlCondition;
-        if (safeText.length() >= 2) {
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < safeText.length() - 1; i++) {
-                if (sb.length() > 0) sb.append(" OR ");
-                String token = safeText.substring(i, i + 2);
-                sb.append("(content LIKE '%").append(token)
-                  .append("%' OR title LIKE '%").append(token).append("%')");
-            }
-            sqlCondition = "(" + sb.toString() + ")";
-        } else {
-            sqlCondition = "(content LIKE '%" + safeText
-                         + "%' OR title LIKE '%" + safeText + "%')";
-        }
-
-        QueryWrapper<BookChapter> wrapper = new QueryWrapper<>();
-        wrapper.eq("book_id", bookId)
-               .apply(sqlCondition)
-               .orderByAsc("sort_order")
-               .last("LIMIT 30");
-        return bookChapterMapper.selectList(wrapper);
     }
 }
