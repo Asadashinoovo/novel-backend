@@ -33,23 +33,34 @@ public class EmbeddingServiceImpl implements IEmbeddingService {
     @Autowired
     private ObjectMapper objectMapper;
 
+    /** 每章最多取几个段落做向量化 */
+    private static final int MAX_CHUNKS = 4;
+    /** 每个段落最大字符数 */
+    private static final int MAX_CHUNK_CHARS = 500;
+
     @Override
     @Transactional
     public void generateAndStoreEmbedding(Long chapterId, Long bookId, String content) {
         try {
-            // 截取前 8000 字符（v3 模型最大 8192 tokens）
-            String truncated = content.length() > 8000 ? content.substring(0, 8000) : content;
+            // 智能分段：取章节的关键段落，而不是傻截前 8000 字
+            List<String> chunks = chunkContent(content, MAX_CHUNKS, MAX_CHUNK_CHARS);
+            if (chunks.isEmpty()) {
+                log.warn("章节无有效文本可向量化: chapterId={}", chapterId);
+                return;
+            }
 
-            float[] vector = embeddingClient.embed(truncated);
+            // 拼接段落作为向量化文本（用换行分隔保持语义独立）
+            String text = String.join("\n\n", chunks);
+            int tokenEstimate = text.length(); // 粗略估算: 1 字符 ≈ 1 token (中文)
+
+            float[] vector = embeddingClient.embed(text);
             if (vector == null || vector.length == 0) {
                 log.error("向量化返回空: chapterId={}", chapterId);
                 return;
             }
 
-            // 序列化为 JSON 数组
             String json = objectMapper.writeValueAsString(vector);
 
-            // 查重：如果已有同章节 embedding，更新
             QueryWrapper<ChapterEmbedding> wrapper = new QueryWrapper<>();
             wrapper.eq("chapter_id", chapterId);
             ChapterEmbedding existing = embeddingMapper.selectOne(wrapper);
@@ -57,7 +68,7 @@ public class EmbeddingServiceImpl implements IEmbeddingService {
             if (existing != null) {
                 existing.setEmbedding(json);
                 existing.setModel("text-embedding-v3");
-                existing.setTokenCount(truncated.length());
+                existing.setTokenCount(tokenEstimate);
                 existing.setCreatedAt(LocalDateTime.now());
                 embeddingMapper.updateById(existing);
             } else {
@@ -66,16 +77,73 @@ public class EmbeddingServiceImpl implements IEmbeddingService {
                 ce.setBookId(bookId);
                 ce.setEmbedding(json);
                 ce.setModel("text-embedding-v3");
-                ce.setTokenCount(truncated.length());
+                ce.setTokenCount(tokenEstimate);
                 ce.setCreatedAt(LocalDateTime.now());
                 embeddingMapper.insert(ce);
             }
 
-            log.info("向量化完成: chapterId={}, dims={}", chapterId, vector.length);
+            log.info("向量化完成: chapterId={}, chunks={}, tokens≈{}",
+                    chapterId, chunks.size(), tokenEstimate);
 
         } catch (Exception e) {
             log.error("向量化失败: chapterId={}, error={}", chapterId, e.getMessage(), e);
         }
+    }
+
+    static List<String> chunkContent(String content, int maxChunks, int maxCharsPerChunk) {
+        if (content == null || content.isBlank()) {
+            return List.of();
+        }
+
+        // 按段落切分（双换行或单换行）
+        String[] rawParagraphs = content.split("\\n\\s*\\n|\\n");
+        List<String> paragraphs = new java.util.ArrayList<>();
+        for (String p : rawParagraphs) {
+            String trimmed = p.trim();
+            if (trimmed.length() < 20) continue; // 跳过太短的（空行、分隔符等）
+            paragraphs.add(trimmed);
+        }
+
+        if (paragraphs.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> selected = new java.util.ArrayList<>();
+
+        // 1. 取开头段（通常是章节引子/背景介绍，检索价值高）
+        selected.add(truncateChunk(paragraphs.get(0), maxCharsPerChunk));
+
+        // 2. 取中间的关键段落（找长度适中的段落，代表剧情主体）
+        if (paragraphs.size() >= 3 && maxChunks >= 2) {
+            int mid = paragraphs.size() / 2;
+            selected.add(truncateChunk(paragraphs.get(mid), maxCharsPerChunk));
+        }
+
+        // 3. 如果还有额度，取第一章和中间之间的一段
+        if (paragraphs.size() >= 5 && maxChunks >= 3) {
+            int q1 = paragraphs.size() / 4;
+            selected.add(truncateChunk(paragraphs.get(q1), maxCharsPerChunk));
+        }
+
+        // 4. 如果还有额度，取结尾段（通常是章节收尾/悬念，语义信息丰富）
+        if (paragraphs.size() >= 2 && maxChunks >= 4) {
+            String truncated = truncateChunk(paragraphs.get(paragraphs.size() - 1), maxCharsPerChunk);
+            if (!selected.contains(truncated)) {
+                selected.add(truncated);
+            }
+        }
+
+        return selected;
+    }
+
+    private static String truncateChunk(String text, int maxChars) {
+        if (text.length() <= maxChars) return text;
+        // 尽量在句号处截断，避免截断词语
+        int cut = text.lastIndexOf('。', maxChars);
+        if (cut > maxChars / 2) {
+            return text.substring(0, cut + 1);
+        }
+        return text.substring(0, maxChars);
     }
 
     @Override

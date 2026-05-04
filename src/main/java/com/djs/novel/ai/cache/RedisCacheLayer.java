@@ -28,16 +28,15 @@ public class RedisCacheLayer implements ICacheLayer {
     private static final String KEY_PREFIX = "ai:cache:";
 
     @Override
-    public Optional<String> get(Long bookId, String normalizedQuestion) {
+    public Optional<String> get(Long bookId, Long maxChapterId, String normalizedQuestion) {
         if (!cacheEnabled) {
             return Optional.empty();
         }
         try {
-            String hash = hash(normalizedQuestion);
-            String key = KEY_PREFIX + bookId + ":" + hash;
+            String key = buildKey(bookId, maxChapterId, normalizedQuestion);
             String cached = redisTemplate.opsForValue().get(key);
             if (cached != null) {
-                log.info("缓存命中: bookId={}, hash={}", bookId, hash);
+                log.info("缓存命中: bookId={}, maxChapterId={}", bookId, maxChapterId);
                 return Optional.of(cached);
             }
         } catch (Exception e) {
@@ -47,18 +46,23 @@ public class RedisCacheLayer implements ICacheLayer {
     }
 
     @Override
-    public void put(Long bookId, String normalizedQuestion, String answer) {
+    public void put(Long bookId, Long maxChapterId, String normalizedQuestion, String answer) {
         if (!cacheEnabled) {
             return;
         }
         try {
-            String hash = hash(normalizedQuestion);
-            String key = KEY_PREFIX + bookId + ":" + hash;
+            String key = buildKey(bookId, maxChapterId, normalizedQuestion);
             redisTemplate.opsForValue().set(key, answer, cacheTtlHours, TimeUnit.HOURS);
-            log.info("缓存写入: bookId={}, hash={}, answerLength={}", bookId, hash, answer.length());
+            log.info("缓存写入: bookId={}, maxChapterId={}, answerLength={}",
+                    bookId, maxChapterId, answer.length());
         } catch (Exception e) {
             log.warn("Redis 缓存写入失败: {}", e.getMessage());
         }
+    }
+
+    private String buildKey(Long bookId, Long maxChapterId, String normalizedQuestion) {
+        String hash = hash(normalizedQuestion);
+        return KEY_PREFIX + bookId + ":" + (maxChapterId != null ? maxChapterId : "0") + ":" + hash;
     }
 
     /**
