@@ -31,7 +31,7 @@ deepseek:
 
 dashscope:
   api:
-    key:
+    key: your_apikey
   embedding:
     model: text-embedding-v3
     dimensions: 1024
