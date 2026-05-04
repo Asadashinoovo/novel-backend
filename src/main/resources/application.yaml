@@ -14,18 +14,33 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/novel?characterEncoding=utf8&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Shanghai
     username: root
-    password: daidai441
+    password: 123456
 
 
   data:
     redis:
-      host: 192.168.183.129
+      host: localhost
       port: 6379
       password:
 
 deepseek:
   api:
-    key: sk-4d39762cd289488492759c6bb1f404d3
+    key: sk-d47af614aff7474382798b62683db216
     base-url: https://api.deepseek.com
     chat-model: deepseek-v4-pro
     timeout: 120
+
+dashscope:
+  api:
+    key: sk-a53e45e88ac64a3db06a20e2e8c351fa
+  embedding:
+    model: text-embedding-v3
+    dimensions: 1024
+
+novel:
+  ai:
+    search-mode: hybrid         # fulltext | vector | hybrid | elasticsearch
+    mq-mode: noop               # noop | rocketmq | rabbitmq
+    cache-enabled: true
+    cache-ttl-hours: 24
+    async-threshold-ms: 10000   # 超过 10s 的请求走 MQ 异步

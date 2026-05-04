@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.djs.novel.ai.mapper.ChapterIndexMapper">
+
+    <select id="findByEntity" resultType="com.djs.novel.ai.entity.ChapterIndex">
+        SELECT ci.*
+        FROM chapter_index ci
+        JOIN book_chapter bc ON ci.chapter_id = bc.id
+        WHERE ci.book_id = #{bookId}
+          AND ci.entity_type = #{entityType}
+          AND ci.entity_name LIKE CONCAT('%', #{entityName}, '%')
+        ORDER BY bc.sort_order ASC
+    </select>
+
+    <select id="findByBookId" resultType="com.djs.novel.ai.entity.ChapterIndex">
+        SELECT * FROM chapter_index
+        WHERE book_id = #{bookId}
+        ORDER BY created_at DESC
+    </select>
+
+    <delete id="deleteByChapterId">
+        DELETE FROM chapter_index WHERE chapter_id = #{chapterId}
+    </delete>
+
+</mapper>

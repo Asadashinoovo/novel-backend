@@ -19,6 +19,7 @@ import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -46,6 +47,7 @@ public class CharacterServiceImpl implements ICharacterService {
 
 
     @Override
+    @Transactional
     public void extractAndStoreCharacters(BookChapter chapter) {
         try {
             String content = chapter.getContent();
@@ -93,6 +95,7 @@ public class CharacterServiceImpl implements ICharacterService {
     }
 
     @Override
+    @Transactional
     public void reExtractForChapter(BookChapter chapter) {
         // 删除旧数据
         characterEventMapper.deleteByChapterId(chapter.getId());
@@ -200,19 +203,47 @@ public class CharacterServiceImpl implements ICharacterService {
         try {
             // 使用 JSON 输出模式提取
             String jsonStr = deepSeekClient.chatCompletionWithJsonOutput(systemPrompt, userPrompt);
-            Map<String, Object> wrapper = objectMapper.readValue(jsonStr,
+            if (jsonStr == null || jsonStr.isBlank()) {
+                log.warn("AI 返回空 JSON 字符串");
+                return List.of();
+            }
+
+            // 尝试从文本中提取 JSON（AI 有时会在 JSON 前后加额外文字）
+            String pureJson = jsonStr;
+            int braceStart = jsonStr.indexOf('{');
+            int braceEnd = jsonStr.lastIndexOf('}');
+            if (braceStart >= 0 && braceEnd > braceStart) {
+                pureJson = jsonStr.substring(braceStart, braceEnd + 1);
+            }
+
+            Map<String, Object> wrapper = objectMapper.readValue(pureJson,
                     new TypeReference<Map<String, Object>>() {});
 
-            List<Map<String, String>> rawList = (List<Map<String, String>>) wrapper.get("characters");
-            if (rawList == null || rawList.isEmpty()) {
+            Object charactersObj = wrapper.get("characters");
+            if (charactersObj == null) {
+                return List.of();
+            }
+            if (!(charactersObj instanceof List)) {
+                log.warn("AI 返回的 characters 字段不是数组类型: {}", charactersObj.getClass());
+                return List.of();
+            }
+
+            List<?> rawList = (List<?>) charactersObj;
+            if (rawList.isEmpty()) {
                 return List.of();
             }
 
             List<CharacterExtraction> result = new ArrayList<>();
-            for (Map<String, String> raw : rawList) {
+            for (Object item : rawList) {
+                if (!(item instanceof Map)) continue;
+                Map<?, ?> raw = (Map<?, ?>) item;
+                Object nameObj = raw.get("name");
+                Object actionObj = raw.get("action");
+                if (nameObj == null) continue;
+
                 CharacterExtraction ext = new CharacterExtraction();
-                ext.setName(raw.get("name"));
-                ext.setAction(raw.get("action"));
+                ext.setName(nameObj.toString());
+                ext.setAction(actionObj != null ? actionObj.toString() : "");
                 result.add(ext);
             }
             return result;
@@ -224,7 +255,9 @@ public class CharacterServiceImpl implements ICharacterService {
     }
 
     /**
-     * 查找已有角色，不存在则创建
+     * 查找已有角色，不存在则创建。
+     * 处理并发场景：如果两个章节同时提取到同一新角色，insert 会触发唯一键冲突，
+     * 此时重新查询返回另一个线程已插入的记录。
      */
     private CharacterInfo findOrCreateCharacter(Long bookId, String name, Long currentChapterId) {
         QueryWrapper<CharacterInfo> wrapper = new QueryWrapper<>();
@@ -240,8 +273,15 @@ public class CharacterServiceImpl implements ICharacterService {
         newChar.setCharacterName(name);
         newChar.setFirstChapterId(currentChapterId);
         newChar.setCreatedAt(LocalDateTime.now());
-        characterInfoMapper.insert(newChar);
-        return newChar;
+
+        try {
+            characterInfoMapper.insert(newChar);
+            return newChar;
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+            // 并发场景：另一个线程已经创建了这个角色，重新查询返回
+            log.info("角色已由其他线程创建: bookId={}, name={}", bookId, name);
+            return characterInfoMapper.selectOne(wrapper);
+        }
     }
 
     @Data
