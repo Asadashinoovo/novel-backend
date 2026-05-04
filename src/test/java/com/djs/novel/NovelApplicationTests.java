@@ -10,7 +10,7 @@ class NovelApplicationTests {
 	@Test
 	void contextLoads() {
 		BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
-
+		encoder.
 
 	}
 
