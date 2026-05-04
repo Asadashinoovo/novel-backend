@@ -33,7 +33,7 @@ dashscope:
   api:
     key: your_apikey
   embedding:
-    model: sk-7305be2f0dcb4b5ea8a7eb07baec4c4f
+    model: text-embedding-v3
     dimensions: 1024
 
 novel:
