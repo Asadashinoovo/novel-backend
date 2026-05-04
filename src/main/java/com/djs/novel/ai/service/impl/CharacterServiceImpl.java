@@ -45,6 +45,7 @@ public class CharacterServiceImpl implements ICharacterService {
 
     private static final int CHAPTER_MAX_CHARS = 3000;
 
+
     @Override
     @Transactional
     public void extractAndStoreCharacters(BookChapter chapter) {
