@@ -22,14 +22,12 @@ public class AuthController {
 
     @PostMapping("/login")
     public Result login(@RequestBody LoginRequest loginRequest) {
-
         return authServiceimpl.login(loginRequest);
     }
 
     @PostMapping("/logout")
     public Result logout() {
         return authServiceimpl.logout();
-
     }
 
 }

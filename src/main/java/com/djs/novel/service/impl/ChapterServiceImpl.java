@@ -10,6 +10,7 @@ import com.djs.novel.service.IChapterService;
 import com.djs.novel.util.UserHolder;
 import com.djs.novel.vo.ChapterContentVO;
 import com.djs.novel.vo.ChapterListVO;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 @Service
+@Slf4j
 public class ChapterServiceImpl
         extends ServiceImpl<BookChapterMapper, BookChapter>
         implements IChapterService {
@@ -71,7 +73,13 @@ public class ChapterServiceImpl
         bookChapter.setWordCount(content==null?0 :content.length());
         bookChapter.setCreatedAt(LocalDateTime.now());
         bookChapter.setUpdatedAt(LocalDateTime.now());
+
+        log.info("书的id为:"+ bookChapter.getBookId());
+        Integer maxSort = chapterMapper.getMaxSortOrder(bookChapter.getBookId());
+        bookChapter.setSortOrder(maxSort == null ? 10 : maxSort + 10);
+
         int affected = chapterMapper.addChapter(bookChapter);
+        log.info("章节的id为:"+ bookChapter.getId());
         if (affected <= 0 || bookChapter.getId() == null) {
             TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             return Result.fail("章节保存失败");
