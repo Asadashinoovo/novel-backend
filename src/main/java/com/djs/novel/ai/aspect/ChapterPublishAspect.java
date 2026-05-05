@@ -38,13 +38,14 @@ public class ChapterPublishAspect {
             pointcut = "execution(* com.djs.novel.service.IChapterService.updateChapter(..))",
             returning = "result")
     public void afterChapterUpdate(JoinPoint joinPoint, Object result) {
-        Result res = (Result) result;
+        /// 暂时注释掉update，有bug,逻辑还需大改。
+        /*Result res = (Result) result;
         if (res.getSuccess() != null && res.getSuccess()) {
             BookChapter chapter = (BookChapter) joinPoint.getArgs()[0];
             log.info("章节更新成功, chapterId={}, bookId={}, 触发 AI 重新生成",
                     chapter.getId(), chapter.getBookId());
             eventPublisher.publishEvent(new ChapterUpdatedEvent(this, chapter));
-        }
+        }*/
     }
 
     @AfterReturning(
