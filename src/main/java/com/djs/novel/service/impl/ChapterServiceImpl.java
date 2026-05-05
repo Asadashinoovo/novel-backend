@@ -73,7 +73,13 @@ public class ChapterServiceImpl
         bookChapter.setWordCount(content==null?0 :content.length());
         bookChapter.setCreatedAt(LocalDateTime.now());
         bookChapter.setUpdatedAt(LocalDateTime.now());
+
+        log.info("书的id为:"+ bookChapter.getBookId());
+        Integer maxSort = chapterMapper.getMaxSortOrder(bookChapter.getBookId());
+        bookChapter.setSortOrder(maxSort == null ? 10 : maxSort + 10);
+
         int affected = chapterMapper.addChapter(bookChapter);
+        log.info("章节的id为:"+ bookChapter.getId());
         if (affected <= 0 || bookChapter.getId() == null) {
             TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             return Result.fail("章节保存失败");

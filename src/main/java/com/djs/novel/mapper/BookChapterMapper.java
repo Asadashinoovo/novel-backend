@@ -35,4 +35,5 @@ public interface BookChapterMapper extends BaseMapper<BookChapter> {
     List<BookChapter> searchChaptersByKeywords(@Param("bookId") Long bookId,
                                                @Param("question") String question);
 
+    Integer getMaxSortOrder(@Param("bookId") Long bookId);
 }
