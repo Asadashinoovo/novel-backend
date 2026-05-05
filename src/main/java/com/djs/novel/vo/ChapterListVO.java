@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 public class ChapterListVO {
     private Long id;
 
+    private Long sortOrder;
     //计算得出的章节序号
     private Integer chapterNum;
 

@@ -8,6 +8,7 @@
             title,
             word_count,
             read_count,
+            sort_order,
             ROW_NUMBER() OVER(PARTITION BY book_id ORDER BY sort_order ASC, id ASC) AS chapterNum
         FROM book_chapter
         WHERE book_id = #{bookId}
