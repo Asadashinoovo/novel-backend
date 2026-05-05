@@ -7,6 +7,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
@@ -14,7 +15,7 @@ import java.util.Map;
 
 /**
  * 阿里云 DashScope 文本向量化客户端。
- * 使用 OpenAI 兼容接口，model=text-embedding-v4，1024 维。
+ * 使用 OpenAI 兼容接口，model=text-embedding-v3，1024 维。
  */
 @Component
 @Slf4j
@@ -30,11 +31,16 @@ public class DashScopeEmbeddingClient {
     private int dimensions;
 
     private static final String BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+    private static final int CONNECT_TIMEOUT = 10_000;
+    private static final int READ_TIMEOUT = 30_000;
 
     private final RestTemplate restTemplate;
 
     public DashScopeEmbeddingClient() {
-        this.restTemplate = new RestTemplate();
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(CONNECT_TIMEOUT);
+        factory.setReadTimeout(READ_TIMEOUT);
+        this.restTemplate = new RestTemplate(factory);
     }
 
     /**
