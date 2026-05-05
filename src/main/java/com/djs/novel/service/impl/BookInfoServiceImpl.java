@@ -16,8 +16,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class BookInfoServiceImpl implements IBookInfoService {
@@ -38,8 +40,14 @@ public class BookInfoServiceImpl implements IBookInfoService {
     @Override
     @Transactional
     public Result addBook(BookDTO bookDTO) {
+        if (bookDTO == null) {
+            return Result.fail("书籍信息不能为空");
+        }
         if (bookDTO.getTitle() == null || bookDTO.getTitle().isBlank()) {
             return Result.fail("书名不能为空");
+        }
+        if (UserHolder.getUser() == null) {
+            return Result.fail("未登录");
         }
         bookDTO.setAuthorId(UserHolder.getUser().getId());
         bookDTO.setCreatedAt(LocalDateTime.now());
@@ -53,7 +61,7 @@ public class BookInfoServiceImpl implements IBookInfoService {
 
         bookDTO.setId(bookInfo.getId());//把回显的主键给bookdto
         List<BookType> types=bookDTO.getTypes();//给书本添加类型types
-        if(!types.isEmpty()) bookInfoMapper.addTypes(bookDTO.getId(),types);
+        if(types != null && !types.isEmpty()) bookInfoMapper.addTypes(bookDTO.getId(),types);
 
         return Result.ok(bookDTO.getId());
     }
@@ -61,10 +69,16 @@ public class BookInfoServiceImpl implements IBookInfoService {
     @Override
     @Transactional
     public Result updateBook(BookDTO bookDTO) {
+        if (bookDTO == null) {
+            return Result.fail("书籍信息不能为空");
+        }
         if (bookDTO.getId() == null) {
             return Result.fail("ID不能为空");
         }
 
+        if (UserHolder.getUser() == null) {
+            return Result.fail("未登录");
+        }
         Long userId = UserHolder.getUser().getId();
         List<Long> ids=new LinkedList<>();
         ids.add(bookDTO.getId());
@@ -72,11 +86,14 @@ public class BookInfoServiceImpl implements IBookInfoService {
             return Result.fail("无权修改此书籍");
         }
 
-        bookInfoMapper.updateBook(bookDTO);
+        int affected = bookInfoMapper.updateBook(bookDTO);
+        if (affected <= 0) {
+            return Result.fail("书籍不存在或未修改");
+        }
 
         bookInfoMapper.deleleTypesByBookIds(ids);//删除types
         List<BookType> types=bookDTO.getTypes();
-        if(!types.isEmpty()) bookInfoMapper.addTypes(bookDTO.getId(),types);
+        if(types != null && !types.isEmpty()) bookInfoMapper.addTypes(bookDTO.getId(),types);
         //插入types
         return Result.ok();
     }
@@ -84,20 +101,44 @@ public class BookInfoServiceImpl implements IBookInfoService {
     @Override
     @Transactional
     public Result deleteBook(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Result.fail("ID不能为空");
+        }
+        if (UserHolder.getUser() == null) {
+            return Result.fail("未登录");
+        }
         Long userId = UserHolder.getUser().getId();
         if(!isOwner(userId,ids)){
             return Result.fail("无权删除此书籍");
         }
         bookChapterMapper.deleteByBookIds(ids);
-        bookInfoMapper.deleteBatchByIds(ids);
+        int affected = bookInfoMapper.deleteBatchByIds(ids);
+        if (affected <= 0) {
+            return Result.fail("书籍不存在");
+        }
         bookInfoMapper.deleleTypesByBookIds(ids);
         return Result.ok();
     }
 
     private boolean isOwner(Long userId,List<Long> ids){
+        if (userId == null || ids == null || ids.isEmpty() || ids.stream().anyMatch(java.util.Objects::isNull)) {
+            return false;
+        }
         List<BookInfo> books=bookInfoMapper.getBookByIds(ids);
+        if (books == null || books.size() != ids.size()) {
+            return false;
+        }
+        Map<Long, BookInfo> bookById = new HashMap<>();
         for (BookInfo book : books) {
-            if(!book.getAuthorId().equals(userId)) return false;
+            if (book != null && book.getId() != null) {
+                bookById.put(book.getId(), book);
+            }
+        }
+        for (Long id : ids) {
+            BookInfo book = bookById.get(id);
+            if (book == null || !userId.equals(book.getAuthorId())) {
+                return false;
+            }
         }
         return true;
     }
@@ -105,6 +146,9 @@ public class BookInfoServiceImpl implements IBookInfoService {
     @Override
     public Result getBookById(Long id){
         BookVO book=bookInfoMapper.getBookById(id);
+        if (book == null) {
+            return Result.fail("书籍不存在");
+        }
         book.setTypes(bookInfoMapper.getTypesByBookId(id));
 
         return Result.ok(book);

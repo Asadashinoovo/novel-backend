@@ -27,6 +27,7 @@ deepseek:
     key: your_apikey
     base-url: https://api.deepseek.com
     chat-model: deepseek-v4-pro
+    connect-timeout: 10
     timeout: 120
 
 dashscope:

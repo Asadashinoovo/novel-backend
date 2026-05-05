@@ -181,7 +181,16 @@ public class AiOrchestratorImpl implements AiOrchestrator {
                 """, contextBlock.toString(), request.getQuestion());
 
         // 6. 调用 LLM
-        String answer = deepSeekClient.chatCompletion(systemPrompt, userPrompt);
+        String answer;
+        try {
+            answer = deepSeekClient.chatCompletion(systemPrompt, userPrompt);
+        } catch (RuntimeException e) {
+            log.warn("AI 对话调用失败: {}", e.getMessage());
+            if (isTimeout(e)) {
+                return Result.fail("AI 服务请求超时，请稍后重试");
+            }
+            return Result.fail("AI 服务暂时不可用，请稍后重试");
+        }
 
         if (answer == null || answer.isBlank()) {
             return Result.fail("AI 暂时无法回答，请稍后重试");
@@ -193,6 +202,23 @@ public class AiOrchestratorImpl implements AiOrchestrator {
                 request.getQuestion(), chatResponse);
 
         return Result.ok(chatResponse);
+    }
+
+    private boolean isTimeout(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null) {
+                String lower = message.toLowerCase();
+                if (lower.contains("timeout")
+                        || lower.contains("timed out")
+                        || message.contains("超时")) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private record ChapterContext(Long chapterId, Integer sortOrder, String title, String snippet) {}
