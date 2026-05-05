@@ -9,6 +9,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,7 +17,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 /**
- * 使用阿里云 DashScope text-embedding-v3 进行文本向量化。
+ * 使用阿里云 DashScope text-embedding-v4 进行文本向量化。
  * 向量以 JSON 数组形式存入 MySQL chapter_embedding 表。
  * 检索时加载书籍所有向量，Java 内存计算余弦相似度。
  */
@@ -32,6 +33,9 @@ public class EmbeddingServiceImpl implements IEmbeddingService {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Value("${dashscope.embedding.model:text-embedding-v4}")
+    private String embeddingModel = "text-embedding-v4";
 
     /** 每章最多取几个段落做向量化 */
     private static final int MAX_CHUNKS = 4;
@@ -67,7 +71,7 @@ public class EmbeddingServiceImpl implements IEmbeddingService {
 
             if (existing != null) {
                 existing.setEmbedding(json);
-                existing.setModel("text-embedding-v3");
+                existing.setModel(embeddingModel);
                 existing.setTokenCount(tokenEstimate);
                 existing.setCreatedAt(LocalDateTime.now());
                 embeddingMapper.updateById(existing);
@@ -76,7 +80,7 @@ public class EmbeddingServiceImpl implements IEmbeddingService {
                 ce.setChapterId(chapterId);
                 ce.setBookId(bookId);
                 ce.setEmbedding(json);
-                ce.setModel("text-embedding-v3");
+                ce.setModel(embeddingModel);
                 ce.setTokenCount(tokenEstimate);
                 ce.setCreatedAt(LocalDateTime.now());
                 embeddingMapper.insert(ce);
@@ -196,6 +200,9 @@ public class EmbeddingServiceImpl implements IEmbeddingService {
      * 余弦相似度: dot(A,B) / (|A| * |B|)
      */
     private double cosineSimilarity(float[] a, float[] b) {
+        if (a == null || b == null || a.length != b.length) {
+            return 0;
+        }
         double dot = 0, normA = 0, normB = 0;
         for (int i = 0; i < a.length; i++) {
             dot += (double) a[i] * b[i];

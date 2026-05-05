@@ -33,7 +33,7 @@
 │    ('秦羽的父亲是谁')                │
 │    → 匹配含"秦羽""父亲"的章节        │
 │                                      │
-│  向量路：DashScope text-embedding-v3 │
+│  向量路：DashScope text-embedding-v4 │
 │    "秦羽的父亲是谁" → 1024维向量     │
 │    → 与所有章节向量算余弦相似度       │
 │    → 语义理解"父亲=秦战天"           │
@@ -102,7 +102,7 @@
 │                                         │
 │  ④ 生成向量                             │
 │     EmbeddingServiceImpl               │
-│     → DashScope text-embedding-v3      │
+│     → DashScope text-embedding-v4      │
 │     → 1024维向量 → JSON                │
 │     → 写入 chapter_embedding 表         │
 │                                         │
@@ -153,7 +153,7 @@ ai/
 | 模式 | 配置值 | 原理 | 适用场景 |
 |------|--------|------|---------|
 | 关键词 | `fulltext` | MySQL FULLTEXT + ngram 分词 | 精确匹配，如"第一章" |
-| 向量语义 | `vector` | text-embedding-v3 + 余弦相似度 | 模糊语义，如"主角他爸" |
+| 向量语义 | `vector` | text-embedding-v4 + 余弦相似度 | 模糊语义，如"主角他爸" |
 | **混合** | **`hybrid`** | 双路召回 + RRF 融合 | **推荐，当前默认** |
 
 切换方式：改一行配置重启即可。
@@ -205,7 +205,7 @@ dashscope:
   api:
     key: <阿里云百炼 API Key>
   embedding:
-    model: text-embedding-v3
+    model: text-embedding-v4
     dimensions: 1024
 
 novel:

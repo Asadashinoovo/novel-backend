@@ -77,13 +77,7 @@ public class DeepSeekClient {
 
             // 推理模型可能在 content 为空时把结果放在 reasoning_content 中
             if (content == null || content.isBlank()) {
-                String reasoning = (String) message.get("reasoning_content");
-                if (reasoning != null && !reasoning.isBlank()) {
-                    // 取 reasoning 的最后部分作为有效回答
-                    log.info("使用 reasoning_content 作为输出 (长度: {})", reasoning.length());
-                    return reasoning;
-                }
-                log.warn("DeepSeek 返回空 content 且无 reasoning_content");
+                log.warn("DeepSeek 返回空 content");
                 return null;
             }
 

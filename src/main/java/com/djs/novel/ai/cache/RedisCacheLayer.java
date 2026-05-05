@@ -1,5 +1,7 @@
 package com.djs.novel.ai.cache;
 
+import com.djs.novel.ai.dto.ChatResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 @Component
@@ -18,6 +21,9 @@ public class RedisCacheLayer implements ICacheLayer {
 
     @Autowired
     private StringRedisTemplate redisTemplate;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Value("${novel.ai.cache-enabled:true}")
     private boolean cacheEnabled;
@@ -28,7 +34,7 @@ public class RedisCacheLayer implements ICacheLayer {
     private static final String KEY_PREFIX = "ai:cache:";
 
     @Override
-    public Optional<String> get(Long bookId, Long maxChapterId, String normalizedQuestion) {
+    public Optional<ChatResponse> get(Long bookId, Long maxChapterId, String normalizedQuestion) {
         if (!cacheEnabled) {
             return Optional.empty();
         }
@@ -37,7 +43,7 @@ public class RedisCacheLayer implements ICacheLayer {
             String cached = redisTemplate.opsForValue().get(key);
             if (cached != null) {
                 log.info("缓存命中: bookId={}, maxChapterId={}", bookId, maxChapterId);
-                return Optional.of(cached);
+                return Optional.of(readCachedResponse(cached));
             }
         } catch (Exception e) {
             log.warn("Redis 缓存读取失败: {}", e.getMessage());
@@ -46,17 +52,42 @@ public class RedisCacheLayer implements ICacheLayer {
     }
 
     @Override
-    public void put(Long bookId, Long maxChapterId, String normalizedQuestion, String answer) {
+    public void put(Long bookId, Long maxChapterId, String normalizedQuestion, ChatResponse response) {
         if (!cacheEnabled) {
             return;
         }
         try {
             String key = buildKey(bookId, maxChapterId, normalizedQuestion);
-            redisTemplate.opsForValue().set(key, answer, cacheTtlHours, TimeUnit.HOURS);
+            String value = objectMapper.writeValueAsString(response);
+            redisTemplate.opsForValue().set(key, value, cacheTtlHours, TimeUnit.HOURS);
             log.info("缓存写入: bookId={}, maxChapterId={}, answerLength={}",
-                    bookId, maxChapterId, answer.length());
+                    bookId, maxChapterId, response.getAnswer() != null ? response.getAnswer().length() : 0);
         } catch (Exception e) {
             log.warn("Redis 缓存写入失败: {}", e.getMessage());
+        }
+    }
+
+    @Override
+    public void evictBook(Long bookId) {
+        if (!cacheEnabled || bookId == null) {
+            return;
+        }
+        try {
+            Set<String> keys = redisTemplate.keys(KEY_PREFIX + bookId + ":*");
+            if (keys != null && !keys.isEmpty()) {
+                redisTemplate.delete(keys);
+                log.info("清理书籍 AI 缓存: bookId={}, keys={}", bookId, keys.size());
+            }
+        } catch (Exception e) {
+            log.warn("Redis 缓存清理失败: bookId={}, error={}", bookId, e.getMessage());
+        }
+    }
+
+    private ChatResponse readCachedResponse(String cached) throws Exception {
+        try {
+            return objectMapper.readValue(cached, ChatResponse.class);
+        } catch (Exception ignored) {
+            return new ChatResponse(cached, java.util.List.of());
         }
     }
 

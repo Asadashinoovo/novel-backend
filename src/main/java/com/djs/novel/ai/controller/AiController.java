@@ -5,10 +5,14 @@ import com.djs.novel.ai.dto.CharacterSearchRequest;
 import com.djs.novel.ai.service.ICharacterService;
 import com.djs.novel.ai.orchestrator.AiOrchestrator;
 import com.djs.novel.ai.service.ISummaryService;
+import com.djs.novel.dto.UserDTO;
 import com.djs.novel.dto.Result;
+import com.djs.novel.entity.BookInfo;
 import com.djs.novel.entity.BookChapter;
+import com.djs.novel.mapper.BookInfoMapper;
 import com.djs.novel.mapper.BookChapterMapper;
-import com.djs.novel.ai.event.ChapterPublishedEvent;
+import com.djs.novel.ai.event.ChapterUpdatedEvent;
+import com.djs.novel.util.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
@@ -33,6 +37,9 @@ public class AiController {
 
     @Autowired
     private BookChapterMapper bookChapterMapper;
+
+    @Autowired
+    private BookInfoMapper bookInfoMapper;
 
     @Autowired
     private ApplicationEventPublisher eventPublisher;
@@ -84,6 +91,18 @@ public class AiController {
      */
     @PostMapping("/admin/reprocess/{bookId}")
     public Result reprocessBook(@PathVariable Long bookId) {
+        UserDTO user = UserHolder.getUser();
+        if (user == null) {
+            return Result.fail("未登录");
+        }
+        BookInfo book = bookInfoMapper.selectById(bookId);
+        if (book == null) {
+            return Result.fail("书籍不存在");
+        }
+        if (!user.getId().equals(book.getAuthorId())) {
+            return Result.fail("无权重建该书籍的 AI 数据");
+        }
+
         List<BookChapter> chapters = bookChapterMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<BookChapter>()
                         .eq("book_id", bookId)
@@ -96,7 +115,7 @@ public class AiController {
         log.info("开始批量 AI 处理: bookId={}, 章节数={}", bookId, chapters.size());
 
         for (BookChapter chapter : chapters) {
-            eventPublisher.publishEvent(new ChapterPublishedEvent(this, chapter));
+            eventPublisher.publishEvent(new ChapterUpdatedEvent(this, chapter));
         }
 
         return Result.ok(Map.of(
