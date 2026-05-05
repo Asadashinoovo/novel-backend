@@ -13,6 +13,7 @@ import com.djs.novel.vo.ChapterListVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -72,6 +73,7 @@ public class ChapterServiceImpl
         bookChapter.setUpdatedAt(LocalDateTime.now());
         int affected = chapterMapper.addChapter(bookChapter);
         if (affected <= 0 || bookChapter.getId() == null) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             return Result.fail("章节保存失败");
         }
         return Result.ok(Map.of("id", bookChapter.getId()));
