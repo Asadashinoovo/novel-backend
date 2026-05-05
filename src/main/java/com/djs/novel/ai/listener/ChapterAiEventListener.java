@@ -3,6 +3,7 @@ package com.djs.novel.ai.listener;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.djs.novel.ai.entity.ChapterEmbedding;
 import com.djs.novel.ai.entity.ChapterSummary;
+import com.djs.novel.ai.cache.ICacheLayer;
 import com.djs.novel.ai.event.ChapterDeletedEvent;
 import com.djs.novel.ai.event.ChapterPublishedEvent;
 import com.djs.novel.ai.event.ChapterUpdatedEvent;
@@ -50,12 +51,16 @@ public class ChapterAiEventListener {
     @Autowired
     private ChapterIndexMapper chapterIndexMapper;
 
+    @Autowired
+    private ICacheLayer cacheLayer;
+
     @Async
     @EventListener
     public void onChapterPublished(ChapterPublishedEvent event) {
         BookChapter chapter = event.getChapter();
         try {
             log.info("开始异步 AI 处理: chapterId={}, bookId={}", chapter.getId(), chapter.getBookId());
+            cacheLayer.evictBook(chapter.getBookId());
 
             summaryService.generateSummary(chapter);
             characterService.extractAndStoreCharacters(chapter);
@@ -76,6 +81,7 @@ public class ChapterAiEventListener {
         try {
             log.info("开始异步 AI 重新处理: chapterId={}, bookId={}",
                     chapter.getId(), chapter.getBookId());
+            cacheLayer.evictBook(chapter.getBookId());
 
             summaryService.regenerateSummary(chapter);
             characterService.reExtractForChapter(chapter);
@@ -98,6 +104,7 @@ public class ChapterAiEventListener {
         Long bookId = chapter.getBookId();
         try {
             log.info("开始清理已删除章节的 AI 数据: chapterId={}, bookId={}", chapterId, bookId);
+            cacheLayer.evictBook(bookId);
 
             // 删除前情提要
             chapterSummaryMapper.delete(

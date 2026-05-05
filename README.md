@@ -94,7 +94,7 @@ novel.sql
 | 模式 | 原理 | 适用场景 |
 |------|------|---------|
 | 关键词 (`fulltext`) | MySQL FULLTEXT + ngram 分词 | 精确匹配 |
-| 向量语义 (`vector`) | DashScope text-embedding-v3 + 余弦相似度 | 模糊语义 |
+| 向量语义 (`vector`) | DashScope text-embedding-v4 + 余弦相似度 | 模糊语义 |
 | 混合 (`hybrid`) | 双路 RRF 融合，默认推荐 | 通用场景 |
 
 **章节生命周期自动管理：**
@@ -111,7 +111,7 @@ novel.sql
 | 组件 | 技术 |
 |------|------|
 | LLM 对话 | DeepSeek (deepseek-v4-pro) |
-| 文本向量化 | 阿里云 DashScope text-embedding-v3 (1024维) |
+| 文本向量化 | 阿里云 DashScope text-embedding-v4 (1024维) |
 | 检索融合 | RRF (Reciprocal Rank Fusion, k=60) |
 | 异步处理 | Spring @Async + ApplicationEvent |
 | 缓存 | Redis (24h TTL, 可配置) |
@@ -134,7 +134,7 @@ dashscope:
   api:
     key: <your-key>
   embedding:
-    model: text-embedding-v3
+    model: text-embedding-v4
     dimensions: 1024
 ```
 

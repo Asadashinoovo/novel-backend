@@ -35,10 +35,7 @@ public class WebConfig implements WebMvcConfigurer {
                         "/api/auth/login",
                         "/api/home/**",
                         "/api/chapter/get/**",
-                        "/api/ai/summary/**",
-                        "/api/ai/character/**",
-                        "/api/ai/chat",
-                        "/api/ai/admin/**"
+                        "/api/ai/summary/**"
                 );
 
 

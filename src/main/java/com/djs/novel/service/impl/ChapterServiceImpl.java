@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class ChapterServiceImpl
@@ -49,7 +50,13 @@ public class ChapterServiceImpl
     @Override
     @Transactional
     public Result addChapter(BookChapter bookChapter) {
+        if (bookChapter == null || bookChapter.getBookId() == null) {
+            return Result.fail("书籍ID不能为空");
+        }
         //判断当前用户是否是 这个book的主人
+        if (UserHolder.getUser() == null) {
+            return Result.fail("未登录");
+        }
         Long userId = UserHolder.getUser().getId();
         List<Long> ids=new ArrayList<>();
         ids.add(bookChapter.getBookId());
@@ -63,15 +70,27 @@ public class ChapterServiceImpl
         bookChapter.setWordCount(content==null?0 :content.length());
         bookChapter.setCreatedAt(LocalDateTime.now());
         bookChapter.setUpdatedAt(LocalDateTime.now());
-        chapterMapper.addChapter(bookChapter);
-        return Result.ok();
+        int affected = chapterMapper.addChapter(bookChapter);
+        if (affected <= 0 || bookChapter.getId() == null) {
+            return Result.fail("章节保存失败");
+        }
+        return Result.ok(Map.of("id", bookChapter.getId()));
     }
 
 
     @Override
     @Transactional
     public Result updateChapter(BookChapter bookChapter) {
+        if (bookChapter == null || bookChapter.getBookId() == null) {
+            return Result.fail("书籍ID不能为空");
+        }
+        if (bookChapter.getId() == null) {
+            return Result.fail("章节ID不能为空");
+        }
         //判断当前用户是否是 这个book的主人
+        if (UserHolder.getUser() == null) {
+            return Result.fail("未登录");
+        }
         Long userId = UserHolder.getUser().getId();
         List<Long> ids=new ArrayList<>();
         ids.add(bookChapter.getBookId());
@@ -82,14 +101,26 @@ public class ChapterServiceImpl
 
         String content=bookChapter.getContent();
         bookChapter.setWordCount(content==null?0 :content.length());
-        chapterMapper.updateChapter(bookChapter);
+        int affected = chapterMapper.updateChapter(bookChapter);
+        if (affected <= 0) {
+            return Result.fail("章节不存在或未修改");
+        }
         return Result.ok();
     }
 
     @Override
     @Transactional
     public Result deleteChapter(Long bookId, Long id) {
+        if (bookId == null) {
+            return Result.fail("书籍ID不能为空");
+        }
+        if (id == null) {
+            return Result.fail("章节ID不能为空");
+        }
         //判断当前用户是否是 这个book的主人
+        if (UserHolder.getUser() == null) {
+            return Result.fail("未登录");
+        }
         Long userId = UserHolder.getUser().getId();
         List<Long> ids=new ArrayList<>();
         ids.add(bookId);
@@ -97,14 +128,32 @@ public class ChapterServiceImpl
         if(!isOwner(userId,ids)){
             return Result.fail("无权删除此书籍");
         }
-        chapterMapper.deleteChapter(bookId, id);
+        int affected = chapterMapper.deleteChapter(bookId, id);
+        if (affected <= 0) {
+            return Result.fail("章节不存在");
+        }
         return Result.ok();
     }
 
     private boolean isOwner(Long userId,List<Long> ids){
+        if (userId == null || ids == null || ids.isEmpty() || ids.stream().anyMatch(java.util.Objects::isNull)) {
+            return false;
+        }
         List<BookInfo> books=bookInfoMapper.getBookByIds(ids);
+        if (books == null || books.size() != ids.size()) {
+            return false;
+        }
+        Map<Long, BookInfo> bookById = new java.util.HashMap<>();
         for (BookInfo book : books) {
-            if(!book.getAuthorId().equals(userId)) return false;
+            if (book != null && book.getId() != null) {
+                bookById.put(book.getId(), book);
+            }
+        }
+        for (Long id : ids) {
+            BookInfo book = bookById.get(id);
+            if (book == null || !userId.equals(book.getAuthorId())) {
+                return false;
+            }
         }
         return true;
     }

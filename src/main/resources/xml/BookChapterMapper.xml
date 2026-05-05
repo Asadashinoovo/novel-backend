@@ -31,7 +31,7 @@
         </foreach>
     </delete>
 
-    <insert id="addChapter">
+    <insert id="addChapter" useGeneratedKeys="true" keyProperty="bookChapter.id" keyColumn="id">
         <selectKey keyProperty="bookChapter.sortOrder" resultType="java.lang.Integer" order="BEFORE">
             SELECT COALESCE(MAX(sort_order), 0) + 10
             FROM book_chapter

@@ -35,12 +35,10 @@ public class FulltextSearchEngine implements ISearchEngine {
     }
 
     private List<SearchResult> fulltextSearch(SearchQuery query) {
-        String escapedQuery = query.question().replace("'", "''");
-
         QueryWrapper<BookChapter> wrapper = new QueryWrapper<>();
         wrapper.eq("book_id", query.bookId())
-               .apply("MATCH(title, content) AGAINST('" + escapedQuery + "' IN NATURAL LANGUAGE MODE) > 0")
-               .orderByDesc("MATCH(title, content) AGAINST('" + escapedQuery + "' IN NATURAL LANGUAGE MODE)")
+               .apply("MATCH(title, content) AGAINST({0} IN NATURAL LANGUAGE MODE) > 0", query.question())
+               .orderByAsc("sort_order")
                .last("LIMIT " + query.topK());
 
         if (query.maxSortOrder() != null) {
@@ -61,26 +59,27 @@ public class FulltextSearchEngine implements ISearchEngine {
             return List.of();
         }
 
-        String safeText = text.replace("'", "''");
-
-        String sqlCondition;
-        if (safeText.length() >= 2) {
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < safeText.length() - 1; i++) {
-                if (sb.length() > 0) sb.append(" OR ");
-                String token = safeText.substring(i, i + 2);
-                sb.append("(content LIKE '%").append(token)
-                  .append("%' OR title LIKE '%").append(token).append("%')");
+        List<String> tokens = new ArrayList<>();
+        if (text.length() >= 2) {
+            for (int i = 0; i < Math.min(text.length() - 1, 20); i++) {
+                tokens.add(text.substring(i, i + 2));
             }
-            sqlCondition = "(" + sb.toString() + ")";
         } else {
-            sqlCondition = "(content LIKE '%" + safeText
-                         + "%' OR title LIKE '%" + safeText + "%')";
+            tokens.add(text);
         }
 
         QueryWrapper<BookChapter> wrapper = new QueryWrapper<>();
         wrapper.eq("book_id", query.bookId())
-               .apply(sqlCondition)
+               .and(w -> {
+                   for (int i = 0; i < tokens.size(); i++) {
+                       String token = tokens.get(i);
+                       if (i == 0) {
+                           w.nested(nested -> nested.like("content", token).or().like("title", token));
+                       } else {
+                           w.or(nested -> nested.like("content", token).or().like("title", token));
+                       }
+                   }
+               })
                .orderByAsc("sort_order")
                .last("LIMIT " + query.topK());
 

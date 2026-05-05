@@ -42,6 +42,7 @@ public class SummaryServiceImpl implements ISummaryService {
     @Transactional
     public void generateSummary(BookChapter currentChapter) {
         try {
+            deleteExistingSummary(currentChapter);
             ChapterSummary summary = buildSummary(currentChapter, false);
             if (summary != null) {
                 summaryMapper.insert(summary);
@@ -108,21 +109,17 @@ public class SummaryServiceImpl implements ISummaryService {
      * 用前一章的摘要 + 最近几章正文，避免 prompt 随章节数膨胀。
      */
     private ChapterSummary buildSummary(BookChapter currentChapter, boolean isRegenerate) {
-        // 只取最近的前置章节（SQL 层加 LIMIT，避免全表扫描）
-        List<BookChapter> priorChapters = bookChapterMapper.selectList(
-                new QueryWrapper<BookChapter>()
-                        .eq("book_id", currentChapter.getBookId())
-                        .lt("sort_order", currentChapter.getSortOrder())
-                        .orderByDesc("sort_order")
-                        .last("LIMIT " + FULL_MODE_MAX_CHAPTERS));
-        Collections.reverse(priorChapters);
+        int recentLimit = isEarlyChapter(currentChapter)
+                ? FULL_MODE_MAX_CHAPTERS
+                : PROGRESSIVE_RECENT_CHAPTERS;
+        List<BookChapter> priorChapters = getRecentPriorChapters(currentChapter, recentLimit);
 
         if (priorChapters.isEmpty()) {
             return firstChapterSummary(currentChapter);
         }
 
         String summaryText;
-        if (priorChapters.size() <= FULL_MODE_MAX_CHAPTERS) {
+        if (isEarlyChapter(currentChapter)) {
             // 全量模式：章节少，直接用正文拼接
             summaryText = generateFromScratch(priorChapters);
         } else {
@@ -136,6 +133,32 @@ public class SummaryServiceImpl implements ISummaryService {
         }
 
         return buildSummaryEntity(currentChapter, summaryText);
+    }
+
+    private boolean isEarlyChapter(BookChapter currentChapter) {
+        return currentChapter.getSortOrder() == null
+                || currentChapter.getSortOrder() <= FULL_MODE_MAX_CHAPTERS + 1;
+    }
+
+    private List<BookChapter> getRecentPriorChapters(BookChapter currentChapter, int limit) {
+        List<BookChapter> priorChapters = new java.util.ArrayList<>(bookChapterMapper.selectList(
+                new QueryWrapper<BookChapter>()
+                        .eq("book_id", currentChapter.getBookId())
+                        .lt("sort_order", currentChapter.getSortOrder())
+                        .orderByDesc("sort_order")
+                        .last("LIMIT " + limit)));
+        Collections.reverse(priorChapters);
+        return priorChapters;
+    }
+
+    private void deleteExistingSummary(BookChapter chapter) {
+        QueryWrapper<ChapterSummary> wrapper = new QueryWrapper<>();
+        wrapper.eq("book_id", chapter.getBookId())
+                .eq("chapter_id", chapter.getId());
+        ChapterSummary existing = summaryMapper.selectOne(wrapper);
+        if (existing != null) {
+            summaryMapper.deleteById(existing.getId());
+        }
     }
 
     /**

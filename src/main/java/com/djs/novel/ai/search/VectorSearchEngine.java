@@ -8,8 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 /**
  * 向量语义检索引擎。
@@ -35,17 +34,34 @@ public class VectorSearchEngine implements ISearchEngine {
             List<ChapterEmbedding> similar = embeddingService.searchSimilar(
                     query.bookId(), query.question(), query.topK());
 
-            // 2. 加载章节详情，组装 SearchResult
-            List<SearchResult> results = new ArrayList<>();
+            // 2. 越章过滤后批量加载章节详情，避免 N+1 查询
+            List<ChapterEmbedding> visibleEmbeddings = new ArrayList<>();
+            List<Long> chapterIds = new ArrayList<>();
             for (ChapterEmbedding ce : similar) {
-                // 越章保护
                 if (query.maxSortOrder() != null
                         && ce.getSortOrder() != null
                         && ce.getSortOrder() > query.maxSortOrder()) {
                     continue;
                 }
+                visibleEmbeddings.add(ce);
+                chapterIds.add(ce.getChapterId());
+            }
 
-                BookChapter chapter = bookChapterMapper.selectById(ce.getChapterId());
+            if (chapterIds.isEmpty()) {
+                return List.of();
+            }
+
+            List<BookChapter> chapters = bookChapterMapper.selectBatchIds(chapterIds);
+            Map<Long, BookChapter> chapterById = new HashMap<>();
+            for (BookChapter chapter : chapters) {
+                if (chapter != null) {
+                    chapterById.put(chapter.getId(), chapter);
+                }
+            }
+
+            List<SearchResult> results = new ArrayList<>();
+            for (ChapterEmbedding ce : visibleEmbeddings) {
+                BookChapter chapter = chapterById.get(ce.getChapterId());
                 if (chapter == null) continue;
 
                 String content = chapter.getContent();

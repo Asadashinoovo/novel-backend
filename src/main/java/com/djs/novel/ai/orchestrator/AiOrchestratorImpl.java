@@ -17,7 +17,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 @Slf4j
@@ -35,90 +39,85 @@ public class AiOrchestratorImpl implements AiOrchestrator {
     @Autowired
     private BookChapterMapper bookChapterMapper;
 
-    private static final int TOP_K = 3;
+    private static final int SEARCH_TOP_K = 3;
+    private static final int MAX_CONTEXTS = 4;
     private static final int CHAPTER_SNIPPET_MAX_CHARS = 800;
+    private static final int QUESTION_MAX_CHARS = 500;
 
     @Override
     public Result chat(ChatRequest request) {
+        if (request == null) {
+            return Result.fail("请求不能为空");
+        }
         log.info("chat request: bookId={}, question={}, maxChapterId={}",
                 request.getBookId(), request.getQuestion(), request.getMaxChapterId());
 
         if (!StringUtils.hasText(request.getQuestion())) {
             return Result.fail("问题不能为空");
         }
+        if (request.getQuestion().length() > QUESTION_MAX_CHARS) {
+            return Result.fail("问题过长，请控制在500字以内");
+        }
         if (request.getBookId() == null) {
             return Result.fail("书籍ID不能为空");
         }
-
-        // 1. 缓存检查（key 包含 maxChapterId，确保不同阅读位置不串缓存）
-        String cached = cacheLayer.get(request.getBookId(), request.getMaxChapterId(),
-                request.getQuestion()).orElse(null);
-        if (cached != null) {
-            ChatResponse chatResponse = new ChatResponse(cached, List.of());
-            return Result.ok(chatResponse);
+        if (request.getMaxChapterId() == null) {
+            return Result.fail("当前阅读章节不能为空");
         }
 
-        // 2. 获取当前章节（越章保护）
-        Integer maxSortOrder = null;
-        BookChapter currentChapter = null;
-        if (request.getMaxChapterId() != null) {
-            currentChapter = bookChapterMapper.selectById(request.getMaxChapterId());
-            if (currentChapter != null) {
-                maxSortOrder = currentChapter.getSortOrder();
-                log.info("越章保护生效: chapterId={}, sortOrder={}",
-                        currentChapter.getId(), maxSortOrder);
-            } else {
-                log.warn("maxChapterId={} 对应的章节不存在，越章保护失效", request.getMaxChapterId());
-            }
-        } else {
-            log.warn("maxChapterId 为空，越章保护未启用！前端未传当前阅读位置");
+        // 1. 获取并校验当前章节（越章保护）
+        BookChapter currentChapter = bookChapterMapper.selectById(request.getMaxChapterId());
+        if (currentChapter == null) {
+            return Result.fail("当前阅读章节不存在");
+        }
+        if (!request.getBookId().equals(currentChapter.getBookId())) {
+            return Result.fail("当前阅读章节不属于该书籍");
+        }
+        Integer maxSortOrder = currentChapter.getSortOrder();
+        log.info("越章保护生效: chapterId={}, sortOrder={}", currentChapter.getId(), maxSortOrder);
+
+        // 2. 缓存检查（key 包含 maxChapterId，确保不同阅读位置不串缓存）
+        ChatResponse cached = cacheLayer.get(request.getBookId(), request.getMaxChapterId(),
+                request.getQuestion()).orElse(null);
+        if (cached != null) {
+            return Result.ok(cached);
         }
 
         // 3. 检索
         SearchQuery searchQuery = new SearchQuery(
-                request.getBookId(), request.getQuestion(), maxSortOrder, TOP_K);
+                request.getBookId(), request.getQuestion(), maxSortOrder, SEARCH_TOP_K);
         List<SearchResult> searchResults = searchEngine.search(searchQuery);
 
         // 4. 构建上下文
         List<ChapterContext> contexts = new ArrayList<>();
-        java.util.Set<Long> addedChapterIds = new java.util.HashSet<>();
+        Set<Long> addedChapterIds = new HashSet<>();
 
         // 4a. 始终优先包含当前章节
-        if (currentChapter != null && StringUtils.hasText(currentChapter.getContent())) {
+        if (StringUtils.hasText(currentChapter.getContent())) {
             addChapterSnippet(currentChapter, contexts, addedChapterIds);
-
-            // 兜底：也加入最近的前置章节
-            if (contexts.size() < TOP_K) {
-                List<BookChapter> priorChapters = bookChapterMapper.selectList(
-                        new QueryWrapper<BookChapter>()
-                                .eq("book_id", currentChapter.getBookId())
-                                .lt("sort_order", currentChapter.getSortOrder())
-                                .orderByDesc("sort_order")
-                                .last("LIMIT " + (TOP_K - contexts.size())));
-                for (BookChapter prior : priorChapters) {
-                    if (contexts.size() >= TOP_K) break;
-                    if (StringUtils.hasText(prior.getContent())) {
-                        addChapterSnippet(prior, contexts, addedChapterIds);
-                    }
-                }
-            }
         }
 
-        // 4b. 加入检索匹配的章节（批量查询避免 N+1）
+        // 4b. 加入检索匹配的章节（保留搜索排序）
         List<Long> idsToFetch = new ArrayList<>();
         for (SearchResult sr : searchResults) {
-            if (contexts.size() >= TOP_K) break;
-            if (addedChapterIds.contains(sr.chapterId())) continue;
+            if (contexts.size() + idsToFetch.size() >= MAX_CONTEXTS) break;
+            if (addedChapterIds.contains(sr.chapterId()) || idsToFetch.contains(sr.chapterId())) continue;
             idsToFetch.add(sr.chapterId());
         }
         if (!idsToFetch.isEmpty()) {
             List<BookChapter> fetchedChapters = bookChapterMapper.selectBatchIds(idsToFetch);
+            Map<Long, BookChapter> chapterById = new HashMap<>();
             for (BookChapter chapter : fetchedChapters) {
-                if (contexts.size() >= TOP_K) break;
+                if (chapter != null) {
+                    chapterById.put(chapter.getId(), chapter);
+                }
+            }
+            for (Long id : idsToFetch) {
+                if (contexts.size() >= MAX_CONTEXTS) break;
+                BookChapter chapter = chapterById.get(id);
                 if (chapter == null || !StringUtils.hasText(chapter.getContent())) continue;
-                if (maxSortOrder != null
-                        && chapter.getSortOrder() != null
-                        && chapter.getSortOrder() > maxSortOrder) {
+                if (!request.getBookId().equals(chapter.getBookId())) continue;
+                if (chapter.getSortOrder() != null && chapter.getSortOrder() > maxSortOrder) {
                     log.warn("越章拦截: 搜索结果包含超出阅读位置的章节 chapterId={}, sortOrder={}, maxSortOrder={}",
                             chapter.getId(), chapter.getSortOrder(), maxSortOrder);
                     continue;
@@ -127,7 +126,23 @@ public class AiOrchestratorImpl implements AiOrchestrator {
             }
         }
 
-        // 4c. 无结果
+        // 4c. 兜底：检索不足时加入最近的前置章节
+        if (contexts.size() < MAX_CONTEXTS) {
+            List<BookChapter> priorChapters = bookChapterMapper.selectList(
+                    new QueryWrapper<BookChapter>()
+                            .eq("book_id", currentChapter.getBookId())
+                            .lt("sort_order", currentChapter.getSortOrder())
+                            .orderByDesc("sort_order")
+                            .last("LIMIT " + (MAX_CONTEXTS - contexts.size())));
+            for (BookChapter prior : priorChapters) {
+                if (contexts.size() >= MAX_CONTEXTS) break;
+                if (StringUtils.hasText(prior.getContent()) && !addedChapterIds.contains(prior.getId())) {
+                    addChapterSnippet(prior, contexts, addedChapterIds);
+                }
+            }
+        }
+
+        // 4d. 无结果
         if (contexts.isEmpty()) {
             return Result.fail("未找到相关章节内容，请尝试其他问题");
         }
@@ -166,18 +181,44 @@ public class AiOrchestratorImpl implements AiOrchestrator {
                 """, contextBlock.toString(), request.getQuestion());
 
         // 6. 调用 LLM
-        String answer = deepSeekClient.chatCompletion(systemPrompt, userPrompt);
+        String answer;
+        try {
+            answer = deepSeekClient.chatCompletion(systemPrompt, userPrompt);
+        } catch (RuntimeException e) {
+            log.warn("AI 对话调用失败: {}", e.getMessage());
+            if (isTimeout(e)) {
+                return Result.fail("AI 服务请求超时，请稍后重试");
+            }
+            return Result.fail("AI 服务暂时不可用，请稍后重试");
+        }
 
         if (answer == null || answer.isBlank()) {
             return Result.fail("AI 暂时无法回答，请稍后重试");
         }
 
+        ChatResponse chatResponse = new ChatResponse(answer, sources);
         // 7. 写缓存（key 包含 maxChapterId）
         cacheLayer.put(request.getBookId(), request.getMaxChapterId(),
-                request.getQuestion(), answer);
+                request.getQuestion(), chatResponse);
 
-        ChatResponse chatResponse = new ChatResponse(answer, sources);
         return Result.ok(chatResponse);
+    }
+
+    private boolean isTimeout(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null) {
+                String lower = message.toLowerCase();
+                if (lower.contains("timeout")
+                        || lower.contains("timed out")
+                        || message.contains("超时")) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private record ChapterContext(Long chapterId, Integer sortOrder, String title, String snippet) {}

@@ -27,13 +27,14 @@ deepseek:
     key: your_apikey
     base-url: https://api.deepseek.com
     chat-model: deepseek-v4-pro
+    connect-timeout: 10
     timeout: 120
 
 dashscope:
   api:
     key: your_apikey
   embedding:
-    model: text-embedding-v3
+    model: text-embedding-v4
     dimensions: 1024
 
 novel:

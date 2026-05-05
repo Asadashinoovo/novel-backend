@@ -15,7 +15,7 @@ import java.util.Map;
 
 /**
  * 阿里云 DashScope 文本向量化客户端。
- * 使用 OpenAI 兼容接口，model=text-embedding-v3，1024 维。
+ * 使用 OpenAI 兼容接口，model=text-embedding-v4，1024 维。
  */
 @Component
 @Slf4j
@@ -24,7 +24,7 @@ public class DashScopeEmbeddingClient {
     @Value("${dashscope.api.key}")
     private String apiKey;
 
-    @Value("${dashscope.embedding.model:text-embedding-v3}")
+    @Value("${dashscope.embedding.model:text-embedding-v4}")
     private String model;
 
     @Value("${dashscope.embedding.dimensions:1024}")
