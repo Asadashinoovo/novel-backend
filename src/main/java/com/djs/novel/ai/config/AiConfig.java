@@ -13,9 +13,10 @@ public class AiConfig {
 
     @Bean
     public RestTemplate deepseekRestTemplate(
+            @Value("${deepseek.api.connect-timeout:10}") int connectTimeoutSeconds,
             @Value("${deepseek.api.timeout:60}") int timeoutSeconds) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofSeconds(5));
+        factory.setConnectTimeout(Duration.ofSeconds(connectTimeoutSeconds));
         factory.setReadTimeout(Duration.ofSeconds(timeoutSeconds));
         return new RestTemplate(factory);
     }

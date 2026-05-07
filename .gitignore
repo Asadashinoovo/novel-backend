@@ -34,5 +34,7 @@ build/
 
 # Production config (may contain sensitive data)
 src/main/resources/application-prod.yaml
+src/main/resources/application-dev.yaml
+src/test/**
 
 docs

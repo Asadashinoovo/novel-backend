@@ -16,9 +16,14 @@
     <select id="getSummaryUpToChapter" resultType="com.djs.novel.ai.entity.ChapterSummary">
         SELECT cs.*
         FROM chapter_summary cs
+        JOIN book_chapter summary_chapter ON cs.chapter_id = summary_chapter.id
+        JOIN book_chapter current_chapter ON current_chapter.id = #{chapterId}
         WHERE cs.book_id = #{bookId}
-          AND cs.chapter_id = #{chapterId}
+          AND current_chapter.book_id = #{bookId}
+          AND summary_chapter.sort_order &lt;= current_chapter.sort_order
           AND cs.status = 'COMPLETED'
+        ORDER BY summary_chapter.sort_order DESC
+        LIMIT 1
     </select>
 
     <select id="getSummaryUpToSortOrder" resultType="com.djs.novel.ai.entity.ChapterSummary">

@@ -20,7 +20,6 @@ public class UserController {
 
     @GetMapping("/me")
     public Result me() {
-
         UserDTO user = UserHolder.getUser();
         if (user == null) {
             return Result.fail("未登录");
@@ -31,8 +30,6 @@ public class UserController {
 
     @PostMapping("/adduser")
     public Result addUser() {
-
-
         return Result.ok();
     }
 }

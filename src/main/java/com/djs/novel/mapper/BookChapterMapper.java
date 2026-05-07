@@ -22,7 +22,7 @@ public interface BookChapterMapper extends BaseMapper<BookChapter> {
 
     int deleteByBookIds(@Param("bookIds") List<Long> bookIds);
 
-    int addChapter(@Param("bookChapter") BookChapter bookChapter);
+    int addChapter(BookChapter bookChapter);
 
     int updateChapter(@Param("bookChapter") BookChapter bookChapter);
 
@@ -35,4 +35,5 @@ public interface BookChapterMapper extends BaseMapper<BookChapter> {
     List<BookChapter> searchChaptersByKeywords(@Param("bookId") Long bookId,
                                                @Param("question") String question);
 
+    Integer getMaxSortOrder(@Param("bookId") Long bookId);
 }

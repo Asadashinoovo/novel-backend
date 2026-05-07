@@ -8,6 +8,7 @@
             title,
             word_count,
             read_count,
+            sort_order,
             ROW_NUMBER() OVER(PARTITION BY book_id ORDER BY sort_order ASC, id ASC) AS chapterNum
         FROM book_chapter
         WHERE book_id = #{bookId}
@@ -31,25 +32,26 @@
         </foreach>
     </delete>
 
-    <insert id="addChapter">
-        <selectKey keyProperty="bookChapter.sortOrder" resultType="java.lang.Integer" order="BEFORE">
-            SELECT COALESCE(MAX(sort_order), 0) + 10
-            FROM book_chapter
-            WHERE book_id = #{bookChapter.bookId}
-        </selectKey>
+    <insert id="addChapter" useGeneratedKeys="true" keyProperty="id">
 
-        <!-- 2. 执行插入 -->
         INSERT INTO book_chapter (
         book_id,sort_order,title,content, created_at, updated_at,word_count
-        ) VALUES (#{bookChapter.bookId},
-              #{bookChapter.sortOrder},
-              #{bookChapter.title},
-              #{bookChapter.content},
-              #{bookChapter.createdAt},
-              #{bookChapter.updatedAt},
-              #{bookChapter.wordCount}
+        ) VALUES (#{bookId},
+              #{sortOrder},
+              #{title},
+              #{content},
+              #{createdAt},
+              #{updatedAt},
+              #{wordCount}
         )
     </insert>
+
+    <select id="getMaxSortOrder" resultType="java.lang.Integer">
+        SELECT COALESCE(MAX(sort_order), 0)
+        FROM book_chapter
+        WHERE book_id = #{bookId}
+    </select>
+
 
     <update id="updateChapter">
         UPDATE book_chapter

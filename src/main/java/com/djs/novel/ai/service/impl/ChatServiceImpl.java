@@ -27,10 +27,12 @@ public class ChatServiceImpl implements IChatService {
     private BookChapterMapper bookChapterMapper;
 
     private static final int TOP_K = 3;
-    private static final int CHAPTER_SNIPPET_MAX_CHARS = 2000;
+    private static final int CHAPTER_SNIPPET_MAX_CHARS = 800;
 
     @Override
     public Result chat(ChatRequest request) {
+        log.info("chat request: bookId={}, question={}, maxChapterId={}",
+                request.getBookId(), request.getQuestion(), request.getMaxChapterId());
         if (!StringUtils.hasText(request.getQuestion())) {
             return Result.fail("问题不能为空");
         }
@@ -41,40 +43,57 @@ public class ChatServiceImpl implements IChatService {
         // 1. 关键词搜索：用多窗口 token 构建 LIKE 条件搜索章节内容
         List<BookChapter> matchingChapters = searchChapters(request.getBookId(), request.getQuestion());
 
-        if (matchingChapters.isEmpty()) {
-            return Result.fail("未找到相关章节内容，请尝试其他问题");
-        }
-
-        // 2. 越章过滤
+        // 2. 获取当前章节（用于越章保护 + 优先加入上下文）
         Integer maxSortOrder = null;
+        BookChapter currentChapter = null;
         if (request.getMaxChapterId() != null) {
-            BookChapter maxChapter = bookChapterMapper.selectById(request.getMaxChapterId());
-            if (maxChapter != null) {
-                maxSortOrder = maxChapter.getSortOrder();
+            currentChapter = bookChapterMapper.selectById(request.getMaxChapterId());
+            if (currentChapter != null) {
+                maxSortOrder = currentChapter.getSortOrder();
             }
         }
 
-        // 3. 构建上下文
+        // 3. 构建上下文：始终优先包含当前章节（用户大概率在问当前章节相关的内容）
         List<ChapterContext> contexts = new ArrayList<>();
+        java.util.Set<Long> addedChapterIds = new java.util.HashSet<>();
+
+        // 3a. 先加入当前章节及其前置章节（用户可见 <= maxSortOrder 的所有章节）
+        if (currentChapter != null && StringUtils.hasText(currentChapter.getContent())) {
+            addChapterSnippet(currentChapter, contexts, addedChapterIds);
+
+            // 兜底：也加入最近的前置章节，确保用户问"前几章"时有上下文可用
+            if (contexts.size() < TOP_K) {
+                List<BookChapter> priorChapters = bookChapterMapper.selectList(
+                        new QueryWrapper<BookChapter>()
+                                .eq("book_id", currentChapter.getBookId())
+                                .lt("sort_order", currentChapter.getSortOrder())
+                                .orderByDesc("sort_order")
+                                .last("LIMIT " + (TOP_K - contexts.size())));
+                for (BookChapter prior : priorChapters) {
+                    if (contexts.size() >= TOP_K) break;
+                    if (StringUtils.hasText(prior.getContent())) {
+                        addChapterSnippet(prior, contexts, addedChapterIds);
+                    }
+                }
+            }
+        }
+
+        // 3b. 再加入关键词搜索匹配的章节
         for (BookChapter chapter : matchingChapters) {
             if (!StringUtils.hasText(chapter.getContent())) {
                 continue;
             }
-            // 越章保护
+            if (addedChapterIds.contains(chapter.getId())) {
+                continue;
+            }
             if (maxSortOrder != null && chapter.getSortOrder() > maxSortOrder) {
                 continue;
             }
-
-            String snippet = chapter.getContent().length() > CHAPTER_SNIPPET_MAX_CHARS
-                    ? chapter.getContent().substring(0, CHAPTER_SNIPPET_MAX_CHARS)
-                    : chapter.getContent();
-
-            contexts.add(new ChapterContext(
-                    chapter.getId(), chapter.getSortOrder(), chapter.getTitle(), snippet));
-
+            addChapterSnippet(chapter, contexts, addedChapterIds);
             if (contexts.size() >= TOP_K) break;
         }
 
+        // 3c. 如果还是没有结果（没传 maxChapterId 且关键词也搜不到），则报错
         if (contexts.isEmpty()) {
             return Result.fail("未找到相关章节内容，请尝试其他问题");
         }
@@ -125,24 +144,44 @@ public class ChatServiceImpl implements IChatService {
 
     private record ChapterContext(Long chapterId, Integer sortOrder, String title, String snippet) {}
 
+    private void addChapterSnippet(BookChapter chapter, List<ChapterContext> contexts,
+                                   java.util.Set<Long> addedIds) {
+        String snippet = chapter.getContent().length() > CHAPTER_SNIPPET_MAX_CHARS
+                ? chapter.getContent().substring(0, CHAPTER_SNIPPET_MAX_CHARS)
+                : chapter.getContent();
+        contexts.add(new ChapterContext(
+                chapter.getId(), chapter.getSortOrder(), chapter.getTitle(), snippet));
+        addedIds.add(chapter.getId());
+    }
+
     /**
-     * 用问题文本中的多窗口 token 搜索章节内容
+     * 用问题文本中的多窗口 token 同时搜索章节标题和内容。
+     * 标题匹配对"第X章讲了什么"这类元问题至关重要。
      */
     private List<BookChapter> searchChapters(Long bookId, String question) {
         // 去除空白
         String text = question.replaceAll("\\s+", "").trim();
 
-        // 构建多窗口 LIKE 条件
+        if (text.isEmpty()) {
+            return List.of();
+        }
+
+        // 构建多窗口 LIKE 条件（转义单引号防 SQL 注入）
+        String safeText = text.replace("'", "''");
+
         String sqlCondition;
-        if (text.length() >= 2) {
+        if (safeText.length() >= 2) {
             StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < text.length() - 1; i++) {
+            for (int i = 0; i < safeText.length() - 1; i++) {
                 if (sb.length() > 0) sb.append(" OR ");
-                sb.append("content LIKE '%").append(text, i, i + 2).append("%'");
+                String token = safeText.substring(i, i + 2);
+                sb.append("(content LIKE '%").append(token)
+                  .append("%' OR title LIKE '%").append(token).append("%')");
             }
             sqlCondition = "(" + sb.toString() + ")";
         } else {
-            sqlCondition = "content LIKE '%" + text + "%'";
+            sqlCondition = "(content LIKE '%" + safeText
+                         + "%' OR title LIKE '%" + safeText + "%')";
         }
 
         QueryWrapper<BookChapter> wrapper = new QueryWrapper<>();
