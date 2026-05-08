@@ -52,6 +52,10 @@
         WHERE book_id = #{bookId}
     </select>
 
+    <select id="getChapterWordCountById" resultType="java.lang.Integer">
+        SELECT word_count FROM book_chapter WHERE id = #{id} AND book_id = #{bookId}
+    </select>
+
 
     <update id="updateChapter">
         UPDATE book_chapter
