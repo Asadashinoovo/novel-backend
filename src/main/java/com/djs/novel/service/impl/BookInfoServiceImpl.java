@@ -49,6 +49,7 @@ public class BookInfoServiceImpl implements IBookInfoService {
         if (UserHolder.getUser() == null) {
             return Result.fail("未登录");
         }
+
         bookDTO.setAuthorId(UserHolder.getUser().getId());
         bookDTO.setCreatedAt(LocalDateTime.now());
         bookDTO.setUpdatedAt(LocalDateTime.now());
@@ -87,6 +88,7 @@ public class BookInfoServiceImpl implements IBookInfoService {
         }
 
         int affected = bookInfoMapper.updateBook(bookDTO);
+
         if (affected <= 0) {
             return Result.fail("书籍不存在或未修改");
         }

@@ -19,6 +19,10 @@ public class BookVO {
     private Integer hotCount;
 
     private String authorName;
-    private List<BookType> types;
 
+    private Integer isFinished;
+    private Long wordCount;
+    private Integer status;
+
+    private List<BookType> types;
 }
