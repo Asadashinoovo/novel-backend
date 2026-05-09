@@ -25,6 +25,12 @@ public class BookDTO {
 
     private LocalDateTime updatedAt;
 
+    private Integer isFinished;
+
+    private Long wordCount;
+
+    private Integer status;
+
     private List<BookType> types;
 
 }

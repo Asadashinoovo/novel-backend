@@ -36,4 +36,6 @@ public interface BookChapterMapper extends BaseMapper<BookChapter> {
                                                @Param("question") String question);
 
     Integer getMaxSortOrder(@Param("bookId") Long bookId);
+
+    Integer getChapterWordCountById(@Param("bookId") Long bookId, @Param("id") Long id);
 }

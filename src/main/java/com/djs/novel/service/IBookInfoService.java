@@ -12,6 +12,5 @@ public interface IBookInfoService {
     Result updateBook(BookDTO bookDTO);
     Result deleteBook(List<Long> ids);
     Result getBookById(Long id);
-
     Result getBookTypes();
 }

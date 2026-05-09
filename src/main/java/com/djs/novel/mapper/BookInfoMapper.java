@@ -45,4 +45,7 @@ public interface BookInfoMapper extends BaseMapper<BookInfo> {
     int addTypes(@Param("bookId") Long bookId, @Param("types") List<BookType> types);
 
     int deleteTypes(@Param("bookId") Long bookId, @Param("types") List<BookType> types);
+
+    int incrWordCount(@Param("bookId") Long bookId, @Param("addCount") Integer addCount);
+
 }
