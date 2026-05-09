@@ -22,6 +22,8 @@
                book_info.author_id, book_info.cover,
                book_info.description,
                book_info.hot_count,
+               book_info.is_finished,
+               book_info.word_count,
                user.username as author_name
         FROM book_info left join user
         on book_info.author_id = user.id
@@ -47,7 +49,7 @@
             <if test="title != null and title != ''">title = #{title},</if>
             <if test="cover != null">cover = #{cover},</if>
             <if test="description != null">description = #{description},</if>
-            <if test="hotCount != null">hot_count = #{hotCount},</if>
+            <if test="isFinished != null">is_finished = #{isFinished},</if>
             updated_at = NOW()
         </set>
         WHERE id = #{id}
@@ -78,5 +80,12 @@
     <delete id="deleteTypes">
 
     </delete>
+
+    <update id="incrWordCount">
+        UPDATE book_info
+        SET word_count = word_count + #{addCount},
+            updated_at = NOW()
+        WHERE id = #{bookId}
+    </update>
 
 </mapper>

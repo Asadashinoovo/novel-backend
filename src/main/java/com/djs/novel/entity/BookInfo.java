@@ -31,4 +31,10 @@ public class BookInfo {
 
     private LocalDateTime updatedAt;
 
+    private Integer isFinished;
+
+    private Long wordCount;
+
+    private Integer status;
+
 }

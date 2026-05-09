@@ -1,6 +1,7 @@
 package com.djs.novel.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.djs.novel.dto.BookDTO;
 import com.djs.novel.dto.Result;
 import com.djs.novel.entity.BookChapter;
 import com.djs.novel.entity.BookInfo;
@@ -70,6 +71,7 @@ public class ChapterServiceImpl
 
         String content=bookChapter.getContent();
 
+
         bookChapter.setWordCount(content==null?0 :content.length());
         bookChapter.setCreatedAt(LocalDateTime.now());
         bookChapter.setUpdatedAt(LocalDateTime.now());
@@ -82,6 +84,9 @@ public class ChapterServiceImpl
             TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             return Result.fail("章节保存失败");
         }
+
+        bookInfoMapper.incrWordCount(bookChapter.getBookId(), bookChapter.getWordCount());
+
         return Result.ok(Map.of("id", bookChapter.getId()));
     }
 
@@ -106,13 +111,18 @@ public class ChapterServiceImpl
         if(!isOwner(userId,ids)){
             return Result.fail("无权修改此书籍");
         }
-
         String content=bookChapter.getContent();
         bookChapter.setWordCount(content==null?0 :content.length());
+
+        Integer increaseWordCount=chapterMapper.getChapterWordCountById(bookChapter.getBookId(),bookChapter.getId());
+        increaseWordCount=bookChapter.getWordCount()-increaseWordCount;
+
         int affected = chapterMapper.updateChapter(bookChapter);
+
         if (affected <= 0) {
             return Result.fail("章节不存在或未修改");
         }
+        bookInfoMapper.incrWordCount(bookChapter.getBookId(),increaseWordCount);
         return Result.ok();
     }
 
@@ -132,14 +142,15 @@ public class ChapterServiceImpl
         Long userId = UserHolder.getUser().getId();
         List<Long> ids=new ArrayList<>();
         ids.add(bookId);
-
         if(!isOwner(userId,ids)){
             return Result.fail("无权删除此书籍");
         }
+        Integer increaseWordCount=chapterMapper.getChapterWordCountById(bookId,id);
         int affected = chapterMapper.deleteChapter(bookId, id);
         if (affected <= 0) {
             return Result.fail("章节不存在");
         }
+        bookInfoMapper.incrWordCount(bookId,-increaseWordCount);
         return Result.ok();
     }
 
