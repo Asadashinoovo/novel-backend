@@ -11,7 +11,7 @@ public interface IChapterService extends IService<BookChapter> {
 
     Result getChapterListByBookId(Long bookId);
 
-    Result addChapter(BookChapter bookChapter);
+    Result addChapter(BookChapter bookChapter, Long afterChapterId);
 
     Result updateChapter(BookChapter bookChapter);
 

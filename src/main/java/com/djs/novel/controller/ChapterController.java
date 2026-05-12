@@ -19,8 +19,9 @@ public class ChapterController {
     }
 
     @PostMapping("/add")
-    public Result addChapter(@RequestBody BookChapter bookChapter) {
-        return chapterService.addChapter(bookChapter);
+    public Result addChapter(@RequestBody BookChapter bookChapter,
+                             @RequestParam(required = false) Long afterChapterId) {
+        return chapterService.addChapter(bookChapter, afterChapterId);
     }
 
 
