@@ -25,13 +25,13 @@ public class ChapterPublishAspect {
             pointcut = "execution(* com.djs.novel.service.IChapterService.addChapter(..))",
             returning = "result")
     public void afterChapterAdd(JoinPoint joinPoint, Object result) {
-        Result res = (Result) result;
+        /*Result res = (Result) result;
         if (res.getSuccess() != null && res.getSuccess()) {
             BookChapter chapter = (BookChapter) joinPoint.getArgs()[0];
             log.info("章节发布成功, chapterId={}, bookId={}, 触发 AI 异步处理",
                     chapter.getId(), chapter.getBookId());
             eventPublisher.publishEvent(new ChapterPublishedEvent(this, chapter));
-        }
+        }*/
     }
 
     @AfterReturning(

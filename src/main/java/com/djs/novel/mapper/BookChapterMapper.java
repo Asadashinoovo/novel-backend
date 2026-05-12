@@ -37,5 +37,9 @@ public interface BookChapterMapper extends BaseMapper<BookChapter> {
 
     Integer getMaxSortOrder(@Param("bookId") Long bookId);
 
+    Integer getSortOrderById(@Param("id") Long id);
+
+    int shiftSortOrderAfter(@Param("bookId") Long bookId, @Param("afterChapterId") Long afterChapterId);
+
     Integer getChapterWordCountById(@Param("bookId") Long bookId, @Param("id") Long id);
 }

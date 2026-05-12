@@ -53,7 +53,7 @@ public class ChapterServiceImpl
 
     @Override
     @Transactional
-    public Result addChapter(BookChapter bookChapter) {
+    public Result addChapter(BookChapter bookChapter, Long afterChapterId) {
         if (bookChapter == null || bookChapter.getBookId() == null) {
             return Result.fail("书籍ID不能为空");
         }
@@ -76,8 +76,17 @@ public class ChapterServiceImpl
         bookChapter.setCreatedAt(LocalDateTime.now());
         bookChapter.setUpdatedAt(LocalDateTime.now());
 
-        Integer maxSort = chapterMapper.getMaxSortOrder(bookChapter.getBookId());
-        bookChapter.setSortOrder(maxSort == null ? 10 : maxSort + 10);
+        if (afterChapterId != null) {
+            Integer targetSort = chapterMapper.getSortOrderById(afterChapterId);
+            if (targetSort == null) {
+                return Result.fail("目标章节不存在");
+            }
+            chapterMapper.shiftSortOrderAfter(bookChapter.getBookId(), afterChapterId);
+            bookChapter.setSortOrder(targetSort );
+        } else {
+            Integer maxSort = chapterMapper.getMaxSortOrder(bookChapter.getBookId());
+            bookChapter.setSortOrder(maxSort == null ? 10 : maxSort + 10);
+        }
         int affected = chapterMapper.addChapter(bookChapter);
 
         if (affected <= 0 || bookChapter.getId() == null) {
