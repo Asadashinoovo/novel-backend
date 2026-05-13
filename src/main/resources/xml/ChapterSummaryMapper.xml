@@ -37,4 +37,15 @@
         LIMIT 1
     </select>
 
+    <update id="markSummariesAfterSortOrderDirty">
+        UPDATE chapter_summary cs
+        JOIN book_chapter bc ON cs.chapter_id = bc.id
+        SET cs.status = 'DIRTY',
+            cs.updated_at = NOW()
+        WHERE cs.book_id = #{bookId}
+          AND bc.book_id = #{bookId}
+          AND bc.sort_order &gt; #{sortOrder}
+          AND cs.status = 'COMPLETED'
+    </update>
+
 </mapper>

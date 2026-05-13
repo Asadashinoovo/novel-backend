@@ -80,6 +80,34 @@ public class SummaryServiceImpl implements ISummaryService {
     }
 
     @Override
+    @Transactional
+    public int regenerateAffectedSummaries(BookChapter changedChapter, int rebuildWindow) {
+        if (changedChapter == null || changedChapter.getBookId() == null
+                || changedChapter.getSortOrder() == null) {
+            return 0;
+        }
+
+        summaryMapper.markSummariesAfterSortOrderDirty(
+                changedChapter.getBookId(), changedChapter.getSortOrder());
+
+        if (rebuildWindow <= 0) {
+            return 0;
+        }
+
+        List<BookChapter> affectedChapters = bookChapterMapper.selectList(
+                new QueryWrapper<BookChapter>()
+                        .eq("book_id", changedChapter.getBookId())
+                        .gt("sort_order", changedChapter.getSortOrder())
+                        .orderByAsc("sort_order")
+                        .last("LIMIT " + rebuildWindow));
+
+        for (BookChapter affectedChapter : affectedChapters) {
+            regenerateSummary(affectedChapter);
+        }
+        return affectedChapters.size();
+    }
+
+    @Override
     public Result getLatestSummary(Long bookId) {
         ChapterSummary summary = summaryMapper.getLatestSummary(bookId);
         if (summary == null) {

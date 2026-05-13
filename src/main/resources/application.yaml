@@ -43,4 +43,18 @@ novel:
     mq-mode: noop               # noop | rocketmq | rabbitmq
     cache-enabled: true
     cache-ttl-hours: 24
+    vector-store: qdrant
+    qdrant:
+      base-url: http://localhost:6333
+      collection-name: novel_rag_chunks
+      vector-size: 1024
+      distance: Cosine
+    chunk:
+      target-chars: 600
+      overlap-chars: 100
+      max-candidates: 40
+      final-top-k: 6
+    summary:
+      rebuild-window: 3
+    rerank-enabled: false
     async-threshold-ms: 10000   # 超过 10s 的请求走 MQ 异步

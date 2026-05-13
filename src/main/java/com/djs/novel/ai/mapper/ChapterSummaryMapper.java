@@ -15,4 +15,7 @@ public interface ChapterSummaryMapper extends BaseMapper<ChapterSummary> {
 
     ChapterSummary getSummaryUpToSortOrder(@Param("bookId") Long bookId,
                                            @Param("sortOrder") Integer sortOrder);
+
+    int markSummariesAfterSortOrderDirty(@Param("bookId") Long bookId,
+                                         @Param("sortOrder") Integer sortOrder);
 }
