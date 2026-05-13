@@ -11,6 +11,8 @@ public interface ISummaryService {
     /** 重新生成（章节更新时） */
     void regenerateSummary(BookChapter chapter);
 
+    int regenerateAffectedSummaries(BookChapter changedChapter, int rebuildWindow);
+
     /** 获取最新摘要 */
     Result getLatestSummary(Long bookId);
 

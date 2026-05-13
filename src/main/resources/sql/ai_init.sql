@@ -13,6 +13,42 @@ CREATE TABLE IF NOT EXISTS chapter_summary (
     UNIQUE KEY uk_book_chapter (book_id, chapter_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS rag_chunk (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    book_id BIGINT NOT NULL,
+    chapter_id BIGINT NOT NULL,
+    sort_order INT NOT NULL,
+    chunk_index INT NOT NULL,
+    content TEXT NOT NULL,
+    content_hash VARCHAR(64) NOT NULL,
+    start_offset INT NOT NULL,
+    end_offset INT NOT NULL,
+    embedding LONGTEXT NULL,
+    embedding_model VARCHAR(80) NULL,
+    token_count INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    UNIQUE KEY uk_chapter_chunk (chapter_id, chunk_index),
+    INDEX idx_book_visible (book_id, sort_order),
+    INDEX idx_chapter (chapter_id),
+    FULLTEXT KEY idx_chunk_content (content)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS chapter_ai_state (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    book_id BIGINT NOT NULL,
+    chapter_id BIGINT NOT NULL,
+    raw_hash VARCHAR(64) NOT NULL,
+    normalized_hash VARCHAR(64) NOT NULL,
+    semantic_hash VARCHAR(64) NOT NULL,
+    last_action VARCHAR(40) NOT NULL,
+    last_reason VARCHAR(255) NULL,
+    processed_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    UNIQUE KEY uk_chapter_ai_state (chapter_id),
+    INDEX idx_book_chapter_ai_state (book_id, chapter_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS character_info (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     book_id BIGINT NOT NULL,

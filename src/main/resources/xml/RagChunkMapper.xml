@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.djs.novel.ai.mapper.RagChunkMapper">
+
+    <delete id="deleteByChapterId">
+        DELETE FROM rag_chunk WHERE chapter_id = #{chapterId}
+    </delete>
+
+    <select id="selectByChapterIdOrderByChunkIndex" resultType="com.djs.novel.ai.entity.RagChunk">
+        SELECT
+            id,
+            book_id AS bookId,
+            chapter_id AS chapterId,
+            sort_order AS sortOrder,
+            chunk_index AS chunkIndex,
+            content,
+            content_hash AS contentHash,
+            start_offset AS startOffset,
+            end_offset AS endOffset,
+            embedding,
+            embedding_model AS embeddingModel,
+            token_count AS tokenCount,
+            created_at AS createdAt,
+            updated_at AS updatedAt
+        FROM rag_chunk
+        WHERE chapter_id = #{chapterId}
+        ORDER BY chunk_index ASC
+    </select>
+
+    <select id="fulltextVisibleSearch" resultType="com.djs.novel.ai.entity.RagChunk">
+        SELECT
+            id,
+            book_id AS bookId,
+            chapter_id AS chapterId,
+            sort_order AS sortOrder,
+            chunk_index AS chunkIndex,
+            content,
+            content_hash AS contentHash,
+            start_offset AS startOffset,
+            end_offset AS endOffset,
+            embedding,
+            embedding_model AS embeddingModel,
+            token_count AS tokenCount,
+            created_at AS createdAt,
+            updated_at AS updatedAt
+        FROM rag_chunk
+        WHERE book_id = #{bookId}
+          AND sort_order &lt;= #{maxSortOrder}
+          AND MATCH(content) AGAINST(#{question} IN NATURAL LANGUAGE MODE)
+        ORDER BY MATCH(content) AGAINST(#{question} IN NATURAL LANGUAGE MODE) DESC,
+                 sort_order ASC,
+                 chunk_index ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="likeVisibleSearch" resultType="com.djs.novel.ai.entity.RagChunk">
+        SELECT
+            id,
+            book_id AS bookId,
+            chapter_id AS chapterId,
+            sort_order AS sortOrder,
+            chunk_index AS chunkIndex,
+            content,
+            content_hash AS contentHash,
+            start_offset AS startOffset,
+            end_offset AS endOffset,
+            embedding,
+            embedding_model AS embeddingModel,
+            token_count AS tokenCount,
+            created_at AS createdAt,
+            updated_at AS updatedAt
+        FROM rag_chunk
+        WHERE book_id = #{bookId}
+          AND sort_order &lt;= #{maxSortOrder}
+          AND content LIKE CONCAT('%', #{keyword}, '%')
+        ORDER BY sort_order ASC, chunk_index ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="getVisibleChunksForVectorSearch" resultType="com.djs.novel.ai.entity.RagChunk">
+        SELECT
+            id,
+            book_id AS bookId,
+            chapter_id AS chapterId,
+            sort_order AS sortOrder,
+            chunk_index AS chunkIndex,
+            content,
+            content_hash AS contentHash,
+            start_offset AS startOffset,
+            end_offset AS endOffset,
+            embedding,
+            embedding_model AS embeddingModel,
+            token_count AS tokenCount,
+            created_at AS createdAt,
+            updated_at AS updatedAt
+        FROM rag_chunk
+        WHERE book_id = #{bookId}
+          AND sort_order &lt;= #{maxSortOrder}
+          AND embedding IS NOT NULL
+          AND embedding != ''
+        ORDER BY sort_order ASC, chunk_index ASC
+    </select>
+
+</mapper>
